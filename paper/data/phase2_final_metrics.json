@@ -1,0 +1,35 @@
+{
+  "B0_wide": {
+    "run_id": "cllm-v1.5-020",
+    "final_step": 8000,
+    "train_loss": 5.6854023933410645,
+    "val_loss": 5.654212474822998,
+    "token_entropy": 7.332310689344045,
+    "grad_norm": 1.7144492864608765,
+    "total_train_tokens": 262144000,
+    "gain/mean": 1,
+    "gain/std": 0.4504947960376739
+  },
+  "B1_conservative": {
+    "run_id": "cllm-v1.5-021",
+    "final_step": 8000,
+    "train_loss": 5.685225486755371,
+    "val_loss": 5.65868616104126,
+    "token_entropy": 7.320911557592787,
+    "grad_norm": 1.6441057920455933,
+    "total_train_tokens": 262144000,
+    "gain/mean": 1.000560283660889,
+    "gain/std": 0.44648534059524536
+  },
+  "B2_tight": {
+    "run_id": "cllm-v1.5-022",
+    "final_step": 8000,
+    "train_loss": 5.693156719207764,
+    "val_loss": 5.658074855804443,
+    "token_entropy": 7.045399815316388,
+    "grad_norm": 1.5064706802368164,
+    "total_train_tokens": 262144000,
+    "gain/mean": 0.9684514999389648,
+    "gain/std": 0.18197056651115415
+  }
+}

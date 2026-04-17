@@ -1,0 +1,50 @@
+# Research Data — Precision-Weighted Training
+
+This directory contains the numerical data backing the paper's quantitative claims. It is extracted from the private Weights & Biases project `troy-corbin-none/Corbin-LLM` and included here so the paper's numbers can be independently verified without W&B access.
+
+All files are JSON. No timestamps, system telemetry, eval text, or internal keys are included — only the research-relevant metrics.
+
+## Contents
+
+### `phase1_final_metrics.json`
+Final-step summary metrics for the four Phase 1 variants (50M parameters, 5K steps, 164M tokens, FineWeb Edu). Supports **Section 4.1** of the paper.
+
+| Key | Variant | W&B run ID |
+|---|---|---|
+| `A0_uniform` | Baseline (standard CE) | cllm-v1.5-015 |
+| `A1_linear` | Linear normalized gain | cllm-v1.5-016 |
+| `A2_focal` | Focal loss gain | cllm-v1.5-017 |
+| `A3_sigmoid` | Sigmoid gain | cllm-v1.5-018 |
+
+### `phase2_final_metrics.json`
+Final-step summary metrics for the three Phase 2 variants (50M parameters, 8K steps, clamp range comparison). Supports **Section 4.2**.
+
+| Key | Clamp range | W&B run ID |
+|---|---|---|
+| `B0_wide` | [0.1, 5.0] | cllm-v1.5-020 |
+| `B1_conservative` | [0.5, 2.0] | cllm-v1.5-021 |
+| `B2_tight` | [0.8, 1.2] | cllm-v1.5-022 |
+
+### `phase3_run_summary.json`
+Final-step summary metrics for the two Phase 3 runs (1.2B parameters, 30K steps, 3.93B tokens). Supports the table in **Section 5.2**, the routing comparison in **Section 5.3**, and the grad-norm discussion in **Section 7.4**.
+
+| Key | Variant | W&B run ID |
+|---|---|---|
+| `baseline` | Standard CE, no layer gain | cllm-v1.5-025 |
+| `gain` | Precision gain + layer gain | cllm-v1.5-026 |
+
+Includes `train_loss`, `val_loss`, `token_entropy`, `grad_norm`, `total_train_tokens`, and `moe/expert_{1,2,3}` routing fractions.
+
+### `phase3_loss_trajectories.json`
+Train-loss and validation-loss values over the full 30K training steps for both Phase 3 runs. Each run's `trajectory` field is a list of `{step, train_loss, val_loss}` objects, sorted by step. Supports the qualitative discussion in **Section 5.2** about noise and the smoothed-vs-single-point reconciliation.
+
+### `phase3_layer_divergence.json`
+Per-block representation divergence `‖x_out − x_in‖ / ‖x_in‖` for the 20 layers of the Phase 3 gain run (cllm-v1.5-026), sampled ~300 times across training. Each row is `{_step, layer_gain/div_layer_00, ..., layer_gain/div_layer_19}`. Supports **Section 5.4**, **Figure 1**, and **Appendix D**.
+
+This is the source data for `figures/_render.py`.
+
+## Notes
+
+- Phase 3's baseline run (cllm-v1.5-025) does not include layer-divergence values because the metric was introduced for the gain run only. This is noted as a limitation in Section 7.3.
+- Where the paper reports rounded values (e.g., "L3: +288%"), the underlying computation uses the unrounded values in these files. Small discrepancies between rounded table values and reported percentages reflect this.
+- The Phase 3 validation-loss trajectory is noisy step-to-step. The paper's smoothed metrics (e.g., "last-10-checkpoints val mean 3.946 vs 3.950") are computed from the trajectory file above.

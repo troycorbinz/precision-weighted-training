@@ -1,0 +1,44 @@
+{
+  "A0_uniform": {
+    "run_id": "cllm-v1.5-015",
+    "final_step": 5000,
+    "train_loss": 6.164542198181152,
+    "val_loss": 6.152401924133301,
+    "token_entropy": 6.783715911730483,
+    "grad_norm": 1.3206990957260132,
+    "total_train_tokens": 163840000
+  },
+  "A1_linear": {
+    "run_id": "cllm-v1.5-016",
+    "final_step": 5000,
+    "train_loss": 6.153585433959961,
+    "val_loss": 6.136930465698242,
+    "token_entropy": 7.260719646346034,
+    "grad_norm": 1.341752290725708,
+    "total_train_tokens": 163840000,
+    "gain/mean": 0.9999999403953552,
+    "gain/std": 0.457910031080246
+  },
+  "A2_focal": {
+    "run_id": "cllm-v1.5-017",
+    "final_step": 5000,
+    "train_loss": 6.19126033782959,
+    "val_loss": 6.1810688972473145,
+    "token_entropy": 6.69688247399957,
+    "grad_norm": 1.2319495677947998,
+    "total_train_tokens": 163840000,
+    "gain/mean": 0.9196767807006836,
+    "gain/std": 0.08926557749509811
+  },
+  "A3_sigmoid": {
+    "run_id": "cllm-v1.5-018",
+    "final_step": 5000,
+    "train_loss": 6.156290054321289,
+    "val_loss": 6.148229122161865,
+    "token_entropy": 7.429347137743732,
+    "grad_norm": 1.3436070680618286,
+    "total_train_tokens": 163840000,
+    "gain/mean": 0.8990418314933777,
+    "gain/std": 0.4634486734867096
+  }
+}

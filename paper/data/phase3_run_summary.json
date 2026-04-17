@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "run_id": "cllm-v1.5-025",
+    "final_step": 30000,
+    "train_loss": 3.717261791229248,
+    "val_loss": 4.082167148590088,
+    "token_entropy": 7.214394153278096,
+    "grad_norm": 1.7157721519470217,
+    "total_train_tokens": 3932160000
+  },
+  "gain": {
+    "run_id": "cllm-v1.5-026",
+    "final_step": 30000,
+    "train_loss": 3.756264925003052,
+    "val_loss": 3.8230230808258057,
+    "token_entropy": 7.425273246731641,
+    "grad_norm": 2.4738094806671143,
+    "total_train_tokens": 3932160000,
+    "gain/mean": 1,
+    "gain/std": 0.4672130048274994
+  }
+}

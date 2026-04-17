@@ -46,7 +46,7 @@ def moving_avg(x, k=5):
 # ─── Figure 1: Layer divergence heatmap ───────────────────────────────
 
 def render_fig1():
-    data = json.loads((HERE / '_data_fig1.json').read_text())
+    data = json.loads((HERE.parent / 'data' / 'phase3_layer_divergence.json').read_text())
     # Skip the first few warmup samples where L0 can spike >5 (breaks scale)
     data = [r for r in data if r['_step'] >= 500]
     n_layers = 20
