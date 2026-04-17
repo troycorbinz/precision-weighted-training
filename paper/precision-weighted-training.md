@@ -446,7 +446,7 @@ Research assistance was provided by Claude (Anthropic), specifically in connecti
 
 ## Appendix A — W&B Run IDs
 
-All runs are in project `troy-corbin-none/Corbin-LLM`.
+All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs are listed below for reference and in case the project is made public in the future; they cannot currently be accessed externally. Selected metrics and trajectories are reported in the paper body and Appendix D.
 
 ### Phase 1 (50M params, 5K steps, FineWeb Edu)
 
@@ -522,7 +522,7 @@ Reported values are `||x_out - x_in|| / ||x_in||` at block boundaries, logged on
 | 25,900 | 1.43 | (—) | 0.72 | (—) | 0.18 | 0.14 | 0.13 | (—) | 0.59 | 0.36 |
 | 29,900 | 1.44 | (—) | 0.71 | (—) | 0.18 | 0.14 | 0.12 | (—) | 0.60 | 0.37 |
 
-Full per-layer data for all 20 layers is available in W&B run `cllm-v1.5-026` under keys `layer_gain/div_layer_00` through `layer_gain/div_layer_19`.
+Full per-layer data for all 20 layers is logged in the private W&B run `cllm-v1.5-026` under keys `layer_gain/div_layer_00` through `layer_gain/div_layer_19`; the values used to generate Figure 1 are available in the figure script at `paper/figures/_render.py` in the public companion repository.
 
 ---
 
@@ -560,4 +560,4 @@ The batch-serving mode of the evaluation webapp works standalone with Flask and 
 
 ### W&B run data
 
-All training runs are logged in W&B project `troy-corbin-none/Corbin-LLM`. Run IDs for all phases are listed in Appendix A.
+All training runs are logged in a private W&B project (`troy-corbin-none/Corbin-LLM`); run IDs for all phases are listed in Appendix A but are not currently accessible externally. The metrics and layer-divergence values used in the paper are reported in the tables, Figure 1, and Appendix D.
