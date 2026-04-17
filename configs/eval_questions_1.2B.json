@@ -1,0 +1,162 @@
+[
+  {
+    "id": 1,
+    "category": "factual",
+    "question": "What is the capital of Japan?"
+  },
+  {
+    "id": 2,
+    "category": "factual",
+    "question": "How many legs does a spider have?"
+  },
+  {
+    "id": 3,
+    "category": "factual",
+    "question": "What planet is closest to the Sun?"
+  },
+  {
+    "id": 4,
+    "category": "factual",
+    "question": "What language is most widely spoken in Brazil?"
+  },
+  {
+    "id": 5,
+    "category": "factual",
+    "question": "Who wrote the play Romeo and Juliet?"
+  },
+  {
+    "id": 6,
+    "category": "factual",
+    "question": "What is the chemical symbol for water?"
+  },
+  {
+    "id": 7,
+    "category": "reasoning",
+    "question": "If a shirt costs $20 and is on sale for 25% off, what is the sale price?"
+  },
+  {
+    "id": 8,
+    "category": "reasoning",
+    "question": "Sarah is taller than Mike. Mike is taller than Emma. Who is the shortest?"
+  },
+  {
+    "id": 9,
+    "category": "reasoning",
+    "question": "I have 3 apples and give away 1. Then someone gives me 4 more. How many apples do I have?"
+  },
+  {
+    "id": 10,
+    "category": "reasoning",
+    "question": "What comes next in the pattern: 2, 4, 8, 16, __?"
+  },
+  {
+    "id": 11,
+    "category": "reasoning",
+    "question": "A farmer has chickens and cows. He counts 10 heads and 28 legs. How many cows does he have?"
+  },
+  {
+    "id": 12,
+    "category": "reasoning",
+    "question": "If all roses are flowers, and some flowers are red, can we say for certain that some roses are red?"
+  },
+  {
+    "id": 13,
+    "category": "creative",
+    "question": "Write a short poem (4 lines) about the ocean."
+  },
+  {
+    "id": 14,
+    "category": "creative",
+    "question": "Describe a sunset to someone who has never seen one, in two or three sentences."
+  },
+  {
+    "id": 15,
+    "category": "creative",
+    "question": "Come up with a name and a one-sentence description for a new ice cream flavor."
+  },
+  {
+    "id": 16,
+    "category": "creative",
+    "question": "Write the opening sentence of a mystery story set in a library."
+  },
+  {
+    "id": 17,
+    "category": "creative",
+    "question": "Invent a superhero whose power is related to cooking. Describe them in a few sentences."
+  },
+  {
+    "id": 18,
+    "category": "conversational",
+    "question": "A friend says they're feeling stressed about an upcoming exam. What would you say to them?"
+  },
+  {
+    "id": 19,
+    "category": "conversational",
+    "question": "Someone asks you to recommend a hobby for a rainy day. What do you suggest and why?"
+  },
+  {
+    "id": 20,
+    "category": "conversational",
+    "question": "How would you politely decline an invitation to a party you can't attend?"
+  },
+  {
+    "id": 21,
+    "category": "conversational",
+    "question": "A coworker asks: 'What's the difference between a meeting and an email?' Give a helpful, brief answer."
+  },
+  {
+    "id": 22,
+    "category": "conversational",
+    "question": "Explain what a computer does to a five-year-old."
+  },
+  {
+    "id": 23,
+    "category": "structured_output",
+    "question": "List the four seasons of the year in order, starting with spring."
+  },
+  {
+    "id": 24,
+    "category": "structured_output",
+    "question": "Convert the following into a JSON object with keys 'name', 'age', and 'city': Maria, 30, Berlin."
+  },
+  {
+    "id": 25,
+    "category": "structured_output",
+    "question": "Summarize the following in exactly one sentence: 'Dogs are loyal animals. They have been companions to humans for thousands of years. Many families consider their dog to be a member of the family.'"
+  },
+  {
+    "id": 26,
+    "category": "structured_output",
+    "question": "Classify each word as a noun, verb, or adjective: run, beautiful, table, sing, bright, mountain."
+  },
+  {
+    "id": 27,
+    "category": "structured_output",
+    "question": "Rewrite this sentence in the past tense: 'She walks to the store and buys some bread.'"
+  },
+  {
+    "id": 28,
+    "category": "instruction_following",
+    "question": "Respond to this message using only three words: 'What is your favorite color?'"
+  },
+  {
+    "id": 29,
+    "category": "instruction_following",
+    "question": "Translate the following English sentence into French: 'The cat is on the table.'"
+  },
+  {
+    "id": 30,
+    "category": "instruction_following",
+    "question": "Write a sentence that contains exactly five words."
+  },
+  {
+    "id": 31,
+    "category": "world_knowledge",
+    "question": "Why do we have different time zones around the world?"
+  },
+  {
+    "id": 32,
+    "category": "world_knowledge",
+    "question": "What happens to water when it freezes?"
+  }
+]
