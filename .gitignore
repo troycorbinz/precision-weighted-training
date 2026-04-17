@@ -1,0 +1,3 @@
+__pycache__/
+*.pyc
+paper/_build_paper.html
