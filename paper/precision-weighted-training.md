@@ -377,7 +377,7 @@ This is both a strength and a limitation. For systems where factual recall must 
 
 ### 7.3 Emergent functional layer specialization
 
-The divergence trajectories (Section 5.4) suggest that layer-gain scaling does not simply amplify existing layer-specific gradients — it actively shapes the representational role of each layer over training. The L3 and L19 growth patterns (both 3–4× increases, both still climbing at step 30K) are not noise; they are sustained, directed structural changes that emerged under the training intervention.
+The divergence trajectories (Section 5.4) suggest that layer-gain scaling does not simply amplify existing layer-specific gradients — it actively shapes the representational role of each layer over training. The L3 and L19 growth patterns (L3 +288% across training, plateauing by ~25K; L19 +387%, still climbing though decelerating at 30K) are not noise; they are sustained, directed structural changes that emerged under the training intervention.
 
 We do not have a baseline comparison for the divergence trajectories (baseline did not log them). We cannot therefore claim that the emergence of three-zone specialization is *caused* by layer-gain scaling — it may occur in uniform training as well. What we can say is that under layer-gain scaling, the specialization is clearly present, continuing to develop at 30K steps, and co-occurring with the quality preference advantage. A same-architecture baseline with layer-divergence logging would be required to cleanly separate these.
 
@@ -395,7 +395,7 @@ There is no training-throughput penalty measured. Baseline and gain runs had mat
 
 **Single-pair comparison at 1.2B.** Phase 3 is a single baseline vs. gain comparison with a single random seed. Running multiple seeds was not feasible given per-run compute cost (~7.5 days on a 5090). The Phase 1 multiple-run comparison at 50M parameters partially compensates but at much smaller scale. Multiple-seed replication at 1.2B is the single most important follow-up.
 
-**16.4% of Chinchilla-optimal.** The gain run trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. We cannot rule out that the preference advantage narrows at full Chinchilla. The layer-divergence trajectory (still growing at 30K) argues against full convergence, but it is not conclusive.
+**16.4% of Chinchilla-optimal.** The gain run trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. We cannot rule out that the preference advantage narrows at full Chinchilla. L19's divergence trajectory (still growing at 30K) argues against full convergence, but it is not conclusive.
 
 **Three AI judges across three model families.** The foundation-model judges (Opus 4.6, ChatGPT, Gemini 2.5 Pro) span Anthropic, OpenAI, and Google, which provides broader cross-validation than a single-family sample. However, all three are trained on large web corpora and may share biases from overlapping training data. Adding judges from more diverse model families (open-weight models, smaller specialist models) would further strengthen this arm.
 
