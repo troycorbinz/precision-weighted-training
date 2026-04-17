@@ -197,7 +197,7 @@ Precision-weighted gain (the Phase 3 formulation) supersedes A1 because it is me
 
 **Data.** 13-dataset training suite (FineWeb Edu, Wikipedia, Gutenberg, multiple conversation / instruct / code corpora) loaded via a deterministic `SequentialCurriculumSampler` with fixed seed 1337. This is important: **both runs saw identical data in identical order**. Any behavioral difference between the two models is therefore attributable to the training-signal intervention, not to data ordering.
 
-**Hardware.** Both runs on a single NVIDIA RTX 5090 (32GB VRAM). Training throughput peaked at ~9,600 tokens/sec; wall-clock time was approximately 7.5 days per run including periodic evaluation, checkpointing, and occasional restart overhead (sustained end-to-end throughput ~6,000 tok/s). (Phase 1 and Phase 2 experiments were conducted on an RTX 3090.)
+**Hardware.** Both runs on a single NVIDIA RTX 5090 (32GB VRAM). Training throughput peaked at ~6,400 tokens/sec with sustained end-to-end throughput of ~6,000 tok/s; wall-clock time was approximately 7.5 days per run including periodic evaluation, checkpointing, and occasional restart overhead. (Phase 1 and Phase 2 experiments were conducted on an RTX 3090.)
 
 **Conditions.** Two runs, identical in every respect except:
 - **Baseline (cllm-v1.5-025):** `training.gain_function: "none"`, `training.layer_gain.enabled: false`.
