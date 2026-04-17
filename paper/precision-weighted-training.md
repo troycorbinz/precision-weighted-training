@@ -193,7 +193,7 @@ Precision-weighted gain (the Phase 3 formulation) supersedes A1 because it is me
 
 **Model.** 20-layer transformer, 1024 embedding dim, 16-head grouped-query attention (8 KV heads, GQA 2:1), 4-expert MoE FFN (top-2 routed, DeepSeek-V2 style shared expert), block size 2048, DeepSeek-V2 100K BPE vocabulary with 27 added emotion tokens (final vocab 100,031). Approximately **1.2B parameters** total. Architecture unchanged between runs.
 
-**Training.** 30,000 steps with effective batch size 131K tokens (batch_size 2, grad_accum 32, block size 2048). Total training tokens: **3.93B** (16.4% of Chinchilla-optimal for this parameter count; 20× params ≈ 24B tokens would be Chinchilla-optimal). Muon optimizer for 2D weight matrices, AdamW (lr 3e-4) for embeddings and norms. Warmup-Stable-Decay scheduler with 500-step warmup, no cooldown (`decay_fraction = 0.0`). Label smoothing 0.1. BF16 precision on RTX 5090.
+**Training.** 30,000 steps with effective batch size 131K tokens (batch_size 2, grad_accum 32, block size 2048). Total training tokens: **3.93B** (16.4% of Chinchilla-optimal for this parameter count; 20× params ≈ 24B tokens would be Chinchilla-optimal; Hoffmann et al., 2022). Muon optimizer for 2D weight matrices (Jordan et al., 2024), AdamW (lr 3e-4) for embeddings and norms. Warmup-Stable-Decay scheduler with 500-step warmup, no cooldown (`decay_fraction = 0.0`). Label smoothing 0.1. BF16 precision on RTX 5090.
 
 **Data.** 13-dataset training suite (FineWeb Edu, Wikipedia, Gutenberg, multiple conversation / instruct / code corpora) loaded via a deterministic `SequentialCurriculumSampler` with fixed seed 1337. This is important: **both runs saw identical data in identical order**. Any behavioral difference between the two models is therefore attributable to the training-signal intervention, not to data ordering.
 
@@ -255,7 +255,7 @@ The rightmost column is L0 divided by the mean of the five sample layers shown i
 
 **Early-transitional band (L4–L6)** sits between the rapidly-growing L1–L3 and the stable middle — final divergence 0.35–0.42, a sub-band within the broader early zone rather than a separate zone.
 
-**Layer 0** remained the structural outlier (1.4–1.8, embedding-to-representation bridge) but ratio-wise fell from ~12× the sample-mean at step 1K to ~4× by step 10K and stabilized there, validating the decision to exclude it from normalization.
+**Layer 0** remained the structural outlier (1.2–1.8 across training, sitting at 1.3–1.5 for most of the run after an early-step peak at 1.77, embedding-to-representation bridge) but ratio-wise fell from ~12× the sample-mean at step 1K to ~4× by step 10K and stabilized there, validating the decision to exclude it from normalization.
 
 Three functional zones emerged over training: **early** (L0–L6, with L0 a structural outlier at 1.4, the strongly-growing L1–L3 finishing at 0.71–0.94, and an L4–L6 transitional sub-band at 0.35–0.42), **mid** (L7–L18, fluctuating between 0.09 and 0.32 with no sustained growth), and **late** (L19, growing from 0.12 to 0.60 with the rate decelerating but not yet plateaued at 30K). This tri-zone structure is not imposed architecturally — the model has no notion of zones. It emerges as a consequence of the training signal's interaction with the loss landscape. We believe the layer-gain mechanism's directed-gradient property accelerates this emergence, though we do not have a baseline comparison for layer divergences (baseline did not log them; the metric was introduced for the gain run). Percent increases are computed from unrounded W&B values; table values above are rounded to two decimals.
 
@@ -306,7 +306,7 @@ Two-sided binomial test against H₀: p = 0.5 on decisive judgments: **p = 1.98 
 | ChatGPT | foundation model | 15 | 17 | 0 | 53.1% |
 | Gemini 2.5 Pro | foundation model | 12 | 16 | 4 | 57.1% |
 
-**9 of 10 judges preferred the gain model** over baseline. The sole exception (H1) was a near-tie (46.7% gain preference), not a reversal — two more gain wins would flip her. Judge preferences spanned the range [47%, 80%], which is consistent with genuine signal rather than an artifact of any single judge.
+**9 of 10 judges preferred the gain model** over baseline. The sole exception (H1) was a near-tie (46.7% gain preference), not a reversal — two more gain wins would flip the result. Judge preferences spanned the range [47%, 80%], which is consistent with genuine signal rather than an artifact of any single judge.
 
 Splitting human judges by technical background: non-technical judges (H1, H2) preferred gain at 55.6% of decisive votes, technical judges without ML background (H3–H6) at 70.5%, and the ML-fluent author at 68.0%. All three groups independently favor gain. The strongest preference comes from the technical-but-not-ML group, not the author — the result is not an artifact of ML-specific evaluation bias.
 
@@ -383,13 +383,13 @@ We do not have a baseline comparison for the divergence trajectories (baseline d
 
 ### 7.4 Grad norm stability
 
-A concern at step 15K in the prior Phase 3 journal was that the gain run's higher gradient variance would destabilize training. Extending to 30K resolves this: gradient norm *mean* is higher (2.50 vs 1.74) but *variance* is equal or lower (std 0.20 vs 0.21). The layer 0 exclusion patch (exclude layer 0 from divergence normalization) implemented before this run was the key stabilization. No instability was observed in the final 15K steps.
+A concern at step 15K in the prior Phase 3 journal was that the gain run's higher gradient variability would destabilize training. Extending to 30K resolves this: gradient norm *mean* is higher (2.50 vs 1.74) but *standard deviation* is equal or lower (0.20 vs 0.21). The layer 0 exclusion patch (exclude layer 0 from divergence normalization) implemented before this run was the key stabilization. No instability was observed in the final 15K steps.
 
 ### 7.5 Compute cost
 
 The per-step compute overhead of the gain function is negligible: one elementwise multiply, one batch-statistics pass (for mean and variance), and per-layer divergence logging (one norm per block during the forward pass, computed outside checkpoint scope). Memory overhead comes entirely from `reduction='none'` in the cross-entropy, which stores the per-token loss tensor (batch × seq_len floats) — roughly 32 KB per step at our config. The per-layer divergence storage is 20 floats per step.
 
-There is no training-throughput penalty measured. Both runs were wall-clock 9600 tok/s within run-to-run variance.
+There is no training-throughput penalty measured. Baseline and gain runs had matched throughput within run-to-run variance (see Section 5.1 for absolute numbers).
 
 ## 8. Discussion / Limitations
 
@@ -413,11 +413,11 @@ There is no training-throughput penalty measured. Both runs were wall-clock 9600
 
 We introduced two composable, Predictive-Coding-inspired training-time interventions — per-token precision-weighted gain and per-layer divergence-scaled gradients — and empirically characterized them across three experimental phases from 50M to 1.2B parameters.
 
-The primary finding is that **the aggregate val-loss metric is not sufficient to evaluate gain-function-style training interventions**. At 1.2B parameters and 3.9B tokens, a gain-trained model achieves smoothed val loss indistinguishable from an identically-configured baseline, yet is preferred in 63.4% of blind pairwise comparisons across 320 judgments by seven human and three foundation-model judges (p = 1.98 × 10⁻⁵), with humans and AI converging on the same verdict.
+The primary finding is that **the aggregate val-loss metric is not sufficient to evaluate gain-function-style training interventions**. At 1.2B parameters and 3.9B tokens, a gain-trained model achieves smoothed val loss indistinguishable from an identically-configured baseline, yet is preferred 161 to 93 in decisive blind pairwise comparisons (63.4% gain, 36.6% baseline, with 66 ties) across 320 judgments by seven human and three foundation-model judges (p = 1.98 × 10⁻⁵), with humans and AI converging on the same verdict.
 
 The category breakdown of the preference result is mechanistically coherent: gain wins or ties in six of seven categories, with its strongest advantages in creative writing (77.5% decisive), world knowledge (81.2%), and conversational tasks (68.3%). Only factual recall — pure retrieval of specific bindings — shows a narrow baseline lean (47.8% decisive). This matches the mechanism's theoretical prediction: precision weighting de-emphasizes confidently predicted outputs, which benefits generalization broadly and costs the model only on rote memorization of specific facts.
 
-Using per-layer representation divergence as a real-time gradient scaling signal during training (novel to this work as far as we are aware) reveals **continuous functional layer specialization** under the layer-gain mechanism, with L3 and L19 growing 288% and 387% across training respectively and still climbing at 30K steps. Three functional zones (early / mid / late) crystallize from an initially flat divergence profile.
+Using per-layer representation divergence as a real-time gradient scaling signal during training (novel to this work as far as we are aware) reveals **continuous functional layer specialization** under the layer-gain mechanism, with L3 and L19 growing 288% and 387% across training respectively. L3 largely plateaued by ~25K steps; L19 was still climbing (though decelerating) at 30K. Three functional zones (early / mid / late) crystallize from an initially flat divergence profile.
 
 **Implications for practice.** For research or production systems where the aggregate loss differences between candidate methods are small (below ~0.1 at 1B-parameter scale), a blind A/B preference evaluation is necessary to distinguish real from illusory improvements. Aggregate loss is not telling the whole story. The gain functions described here are cheap (near-zero compute overhead), optimizer-agnostic, and composable with existing methods — they are appropriate for use in any training pipeline where diverse generation matters more than template completion.
 
