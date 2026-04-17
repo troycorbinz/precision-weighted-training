@@ -421,7 +421,7 @@ Using per-layer representation divergence as a real-time gradient scaling signal
 
 **Implications for practice.** For research or production systems where the aggregate loss differences between candidate methods are small (below ~0.1 at 1B-parameter scale), a blind A/B preference evaluation is necessary to distinguish real from illusory improvements. Aggregate loss is not telling the whole story. The gain functions described here are cheap (near-zero compute overhead), optimizer-agnostic, and composable with existing methods — they are appropriate for use in any training pipeline where diverse generation matters more than template completion.
 
-**Open questions.** (1) Does the gain advantage persist, compound, or reverse at full Chinchilla-optimal training? (2) Which of the two mechanisms (token gain vs. layer gain) accounts for most of the observed advantage? (3) How does the method interact with post-training stages (SFT, RLHF)? (4) Can the layer-divergence profile be used as a principled signal for architecture decisions — e.g., allocating parameters to the zones that are doing the most work?
+**Open questions.** (1) Does the gain advantage persist, compound, or reverse at full Chinchilla-optimal training? *A Chinchilla-scale replication using precision-weighted gain and layer-gain scaling on a ~1.5B-parameter model is currently in progress; results will appear in a follow-up.* (2) Which of the two mechanisms (token gain vs. layer gain) accounts for most of the observed advantage? (3) How does the method interact with post-training stages (SFT, RLHF)? (4) Can the layer-divergence profile be used as a principled signal for architecture decisions — e.g., allocating parameters to the zones that are doing the most work?
 
 ---
 
