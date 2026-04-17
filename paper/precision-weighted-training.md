@@ -10,7 +10,7 @@
 
 ## Abstract
 
-Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases of increasing scale, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges — seven humans and three foundation models (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **the gain-trained model generalizes 5.4× better**, with a train-val gap of 0.067 versus baseline's 0.365; (4) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable.
+Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases of increasing scale, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges — seven humans and three foundation models (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable.
 
 The result is a training-time intervention that is optimizer-agnostic, cheap (adds a single elementwise multiply per training step), and produces models that humans and foundation-model judges prefer — while being invisible to the aggregate loss metric that defines most of the LLM training literature.
 
@@ -28,11 +28,11 @@ This paper develops and empirically characterizes two training-time intervention
 
 2. **A complementary layer-level mechanism**: per-block forward-pass representation divergence is used as a precision signal to scale parameter gradients after backward. Layers that are actively revising their representations receive amplified gradients; stable layers are attenuated. Like token gain, layer gain is mean-normalized and preserves the total gradient budget.
 
-3. **Empirical evidence that the aggregate loss metric is insufficient.** In a controlled 1.2B-parameter comparison trained on identical data in identical order for 30,000 steps (3.9B tokens), baseline and gain-trained models achieve nearly identical smoothed val loss, yet the gain model is preferred 63.4% of the time in blind pairwise comparison by a panel of seven human and three foundation-model judges. Humans and AI agree (65.3% vs 59.8% gain preference of decisive judgments). The gain model also exhibits a 5.4× smaller train-val generalization gap. These are large, replicable signals that aggregate loss simply cannot see.
+3. **Empirical evidence that the aggregate loss metric is insufficient.** In a controlled 1.2B-parameter comparison trained on identical data in identical order for 30,000 steps (3.9B tokens), baseline and gain-trained models achieve nearly identical smoothed val loss, yet the gain model is preferred 63.4% of the time in blind pairwise comparison by a panel of seven human and three foundation-model judges. Humans and AI agree (65.3% vs 59.8% gain preference of decisive judgments). These are large, replicable signals that aggregate loss simply cannot see.
 
 **Scope and key limitations (detailed in Section 8).** The Phase 3 result is a single-seed, single-pair comparison at 16.4% of Chinchilla-optimal training. We do not ablate token gain and layer gain separately at 1.2B scale — both are combined in the gain run. The baseline did not log layer divergences, so we cannot confirm whether the observed layer specialization is caused by layer-gain scaling or would emerge under uniform training as well. The A/B evaluation uses short-form prompts only (the models are too undertrained for long-form), and the foundation-model judges may share biases from overlapping training data. These are important caveats for interpreting the strength of the claims.
 
-The paper is structured as follows. Section 2 frames the work in the Predictive Coding literature. Section 3 describes both mechanisms and the config surface. Sections 4–5 report three experimental phases: mechanism-shape sensitivity at small scale (Phase 1), clamp-range sensitivity (Phase 2), and scale validation at 1.2B parameters (Phase 3). Section 6 describes the blind A/B preference evaluation in detail, including per-judge agreement and per-category breakdown. Section 7 analyses loss-quality divergence, generalization gap, and layer-specialization emergence. Section 8 discusses limitations in full. Section 9 concludes.
+The paper is structured as follows. Section 2 frames the work in the Predictive Coding literature. Section 3 describes both mechanisms and the config surface. Sections 4–5 report three experimental phases: mechanism-shape sensitivity at small scale (Phase 1), clamp-range sensitivity (Phase 2), and scale validation at 1.2B parameters (Phase 3). Section 6 describes the blind A/B preference evaluation in detail, including per-judge agreement and per-category breakdown. Section 7 analyses loss-quality divergence and layer-specialization emergence. Section 8 discusses limitations in full. Section 9 concludes.
 
 ## 2. Background: Predictive Coding and Precision Weighting
 
@@ -210,27 +210,12 @@ Precision-weighted gain (the Phase 3 formulation) supersedes A1 because it is me
 | Final train loss (step 30000) | 3.717 | 3.756 | +0.039 (BL) |
 | Final val loss (step 30000) | 4.082 | 3.823 | −0.259 (Gain) |
 | **Last-10 checkpoints val mean (smoothed)** | **3.946** | **3.950** | **+0.004 (negligible)** |
-| Train-val gap @ 30000 | **+0.365** | **+0.067** | **5.4× smaller for gain** |
-| Train-val gap @ 20000 | +0.176 | +0.054 | 3.3× smaller for gain |
 | Mean grad norm | 1.738 | 2.497 | Higher but stable (std 0.210 vs 0.204) |
 | Token entropy | 7.214 | 7.425 | +0.211 (more diverse output) |
 
-The single-point val loss at step 30,000 flatters the gain run (baseline landed on a noisy spike, the gain run on a low point); the smoothed last-10-checkpoint mean is the correct summary. On that measure, **the two runs are statistically indistinguishable on aggregate val loss** (0.004 difference, well inside step-to-step noise ±0.2).
+The single-point val loss at step 30,000 flatters the gain run (baseline landed on a noisy spike, the gain run on a low point); the smoothed last-10-checkpoint mean is the correct summary. On that measure, **the two runs are statistically indistinguishable on aggregate val loss** (0.004 difference, well inside step-to-step noise ±0.2). Step-to-step train–val gap measurements are similarly noisy — individual-step gap ratios between the two runs fluctuate between ~0.2× and ~5× depending on which step is sampled, and rolling averages show the gaps are essentially equivalent. We do not claim a generalization-gap advantage from loss-level metrics at this scale; the separation between the two runs is visible in preference evaluation (Section 6), not in aggregate loss.
 
-What is *not* indistinguishable is the train-val gap. At 30K steps, baseline exhibits a generalization gap more than 5× larger than gain. This gap grew steadily for baseline and stayed small for gain:
-
-| Step | BL gap | Gain gap | Ratio |
-|---|---|---|---|
-| 5K | −0.164 | −0.143 | same (neg: still underfitting) |
-| 10K | +0.121 | +0.110 | same |
-| 15K | +0.072 | +0.162 | gain gap briefly higher |
-| 20K | +0.176 | +0.054 | BL 3.3× larger |
-| 25K | −0.211 | +0.030 | noisy (BL val spike low) |
-| 30K | +0.365 | +0.067 | **BL 5.4× larger** |
-
-The 15K step showed baseline gap briefly lower — this was the "inconclusive" point we documented in the earlier phase-3 journal. Extending to 30K resolves it: baseline's train loss continued to fall but its val loss stopped falling, while gain's two curves continued to track each other. **Gain does not memorize as aggressively.**
-
-Grad norm stability is also notable. The gain run's grad norm mean (2.50) is higher than baseline's (1.74), but its standard deviation is slightly *lower* (0.20 vs 0.21). The layer-gain scaling increases the total gradient magnitude without inflating variance — consistent with the claim that it redirects rather than amplifies.
+Grad norm stability is notable. The gain run's grad norm mean (2.50) is higher than baseline's (1.74), but its standard deviation is slightly *lower* (0.20 vs 0.21). The layer-gain scaling increases the total gradient magnitude without inflating variance — consistent with the claim that it redirects rather than amplifies.
 
 ### 5.3 Expert utilization
 
@@ -269,6 +254,10 @@ The headline finding is **continuous specialization across the full training run
 **Layer 0** remained the structural outlier (1.4–1.8, embedding-to-representation bridge) but ratio-wise stabilized at ~4× the mean by step 5K, validating the decision to exclude it from normalization.
 
 Three functional zones emerged over training: **early** (L0–L6, with L0 a structural outlier at 1.4 and L1–L6 finishing at 0.35–0.94 after substantial growth), **mid** (L7–L18, fluctuating between 0.09 and 0.32 with no sustained growth), and **late** (L19, spiking from 0.12 to 0.60 and still growing at 30K). This tri-zone structure is not imposed architecturally — the model has no notion of zones. It emerges as a consequence of the training signal's interaction with the loss landscape. We believe the layer-gain mechanism's directed-gradient property accelerates this emergence, though we do not have a baseline comparison for layer divergences (baseline did not log them; the metric was introduced for the gain run). Percent increases are computed from unrounded W&B values; table values above are rounded to two decimals.
+
+![Per-layer representation divergence across training, log-colored. The early zone (L0–L6) is bright throughout, with L1–L3 showing substantial growth. The mid zone (L7–L18) stays dark — these layers make small consistent adjustments. The late zone (L19) darkens at left and brightens at right, reflecting its 387% growth across training.](figures/fig1_layer_divergence.png)
+
+**Figure 1.** Layer divergence trajectory for the gain run (cllm-v1.5-026). Each cell shows `‖x_out − x_in‖ / ‖x_in‖` for one transformer block at one training step (smoothed with a 5-step window, log-scaled color). The three functional zones are annotated on the right.
 
 ## 6. Blind A/B Preference Evaluation
 
@@ -370,17 +359,9 @@ We are not aware of prior work that demonstrates this magnitude of loss-quality 
 
 The mechanism of the divergence is understandable. Aggregate cross-entropy is dominated by the most-frequent tokens — function words, punctuation, common content words. The model's loss on rare or surprising tokens is a small contribution to the aggregate. Gain functions precisely target that distribution: they amplify gradient on rare/surprising tokens at the cost of diminished gradient on the common ones. If the rare-token component of quality matters (creative output, diverse phrasing, appropriate contextual choices) but contributes little to the aggregate, then a method that improves the rare-token component while keeping the aggregate the same is exactly what we observe.
 
-### 7.2 Generalization gap
+### 7.2 Episodic-to-semantic consolidation
 
-The 5.4× reduction in train-val gap at 30K steps is a direct quantitative consequence of the mechanism. At matched training cost and matched data, the gain model is **doing substantially less memorization**. Its train loss is 0.04 higher than baseline's, but its val loss is essentially the same. Per unit of training-loss reduction, gain is producing more transferable learning.
-
-This is consistent with the mechanism: precision-weighted gain de-emphasizes gradient on tokens the model already predicts confidently. In a typical training batch, the tokens the model is most confident about are the ones most amenable to memorization (exact n-gram completions, common phrases). Reducing gradient on those reduces the memorization signal specifically, without sacrificing the harder learning.
-
-The practical implication is that gain's effective parameter efficiency at the same data budget is higher. At 16.4% of Chinchilla-optimal, the gain model already generalizes substantially better; whether this advantage compounds, saturates, or reverses at full Chinchilla scale is an open question we cannot answer from this single comparison.
-
-### 7.3 Episodic-to-semantic consolidation
-
-The generalization-gap result and the per-category preference breakdown together suggest a deeper dynamic: precision-weighted gain creates a continuous pressure that favors **semantic generalization over episodic memorization**.
+The per-category preference breakdown suggests a deeper dynamic: precision-weighted gain creates a continuous pressure that favors **semantic generalization over episodic memorization**.
 
 The mechanism is straightforward. Once the model has learned a specific pattern (a particular fact, a templated phrase), its per-token loss on that pattern drops, the gain function attenuates gradient on it, and subsequent training steps redirect gradient toward harder, unresolved tokens. But the weights that encoded that specific pattern are not frozen — they continue to receive gradient pressure from the amplified signal on newer, harder material. Over extended training, the specific encoding gradually blurs as the weights are co-opted to serve broader generalizations.
 
@@ -390,17 +371,17 @@ This maps onto a well-studied dynamic in biological learning systems. Complement
 
 This is both a strength and a limitation. For systems where factual recall must be precise (a knowledge base, a retrieval system), precision-weighted gain's bias toward generalization is a cost. For systems where generalization, fluency, and diverse generation matter more — and where specific facts can be supplied via retrieval or context — it is a direct advantage. The appropriate choice depends on the deployment context.
 
-### 7.4 Emergent functional layer specialization
+### 7.3 Emergent functional layer specialization
 
 The divergence trajectories (Section 5.4) suggest that layer-gain scaling does not simply amplify existing layer-specific gradients — it actively shapes the representational role of each layer over training. The L3 and L19 growth patterns (both 3–4× increases, both still climbing at step 30K) are not noise; they are sustained, directed structural changes that emerged under the training intervention.
 
 We do not have a baseline comparison for the divergence trajectories (baseline did not log them). We cannot therefore claim that the emergence of three-zone specialization is *caused* by layer-gain scaling — it may occur in uniform training as well. What we can say is that under layer-gain scaling, the specialization is clearly present, continuing to develop at 30K steps, and co-occurring with the quality preference advantage. A same-architecture baseline with layer-divergence logging would be required to cleanly separate these.
 
-### 7.5 Grad norm stability
+### 7.4 Grad norm stability
 
 A concern at step 15K in the prior Phase 3 journal was that the gain run's higher gradient variance would destabilize training. Extending to 30K resolves this: gradient norm *mean* is higher (2.50 vs 1.74) but *variance* is equal or lower (std 0.20 vs 0.21). The layer 0 exclusion patch (exclude layer 0 from divergence normalization) implemented before this run was the key stabilization. No instability was observed in the final 15K steps.
 
-### 7.6 Compute cost
+### 7.5 Compute cost
 
 The per-step compute overhead of the gain function is negligible: one elementwise multiply, one batch-statistics pass (for mean and variance), and per-layer divergence logging (one norm per block during the forward pass, computed outside checkpoint scope). Memory overhead comes entirely from `reduction='none'` in the cross-entropy, which stores the per-token loss tensor (batch × seq_len floats) — roughly 32 KB per step at our config. The per-layer divergence storage is 20 floats per step.
 
@@ -410,7 +391,7 @@ There is no training-throughput penalty measured. Both runs were wall-clock 9600
 
 **Single-pair comparison at 1.2B.** Phase 3 is a single baseline vs. gain comparison with a single random seed. Running multiple seeds was not feasible given per-run compute cost (~7.5 days on a 5090). The Phase 1 multiple-run comparison at 50M parameters partially compensates but at much smaller scale. Multiple-seed replication at 1.2B is the single most important follow-up.
 
-**16.4% of Chinchilla-optimal.** The gain run trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. We cannot rule out that baseline eventually catches up on the generalization-gap metric at full Chinchilla, or that the preference advantage narrows. The layer-divergence trajectory (still growing at 30K) argues against full convergence, but it is not conclusive.
+**16.4% of Chinchilla-optimal.** The gain run trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. We cannot rule out that the preference advantage narrows at full Chinchilla. The layer-divergence trajectory (still growing at 30K) argues against full convergence, but it is not conclusive.
 
 **Three AI judges across three model families.** The foundation-model judges (Opus 4.6, ChatGPT, Gemini 2.5 Pro) span Anthropic, OpenAI, and Google, which provides broader cross-validation than a single-family sample. However, all three are trained on large web corpora and may share biases from overlapping training data. Adding judges from more diverse model families (open-weight models, smaller specialist models) would further strengthen this arm.
 
@@ -428,7 +409,7 @@ There is no training-throughput penalty measured. Both runs were wall-clock 9600
 
 We introduced two composable, Predictive-Coding-inspired training-time interventions — per-token precision-weighted gain and per-layer divergence-scaled gradients — and empirically characterized them across three experimental phases from 50M to 1.2B parameters.
 
-The primary finding is that **the aggregate val-loss metric is not sufficient to evaluate gain-function-style training interventions**. At 1.2B parameters and 3.9B tokens, a gain-trained model achieves smoothed val loss indistinguishable from an identically-configured baseline, yet is preferred in 63.4% of blind pairwise comparisons across 320 judgments by seven human and three foundation-model judges (p = 1.98 × 10⁻⁵), with humans and AI converging on the same verdict. The gain model also exhibits a 5.4× smaller train-val generalization gap, consistent with reduced memorization and better transfer at matched training cost.
+The primary finding is that **the aggregate val-loss metric is not sufficient to evaluate gain-function-style training interventions**. At 1.2B parameters and 3.9B tokens, a gain-trained model achieves smoothed val loss indistinguishable from an identically-configured baseline, yet is preferred in 63.4% of blind pairwise comparisons across 320 judgments by seven human and three foundation-model judges (p = 1.98 × 10⁻⁵), with humans and AI converging on the same verdict.
 
 The category breakdown of the preference result is mechanistically coherent: gain wins or ties in six of seven categories, with its strongest advantages in creative writing (77.5% decisive), world knowledge (81.2%), and conversational tasks (68.3%). Only factual recall — pure retrieval of specific bindings — shows a narrow baseline lean (47.8% decisive). This matches the mechanism's theoretical prediction: precision weighting de-emphasizes confidently predicted outputs, which benefits generalization broadly and costs the model only on rote memorization of specific facts.
 

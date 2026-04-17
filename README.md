@@ -39,7 +39,6 @@ In a controlled 1.2B-parameter comparison (3.9B tokens, both models trained on i
 |---|---|---|
 | Smoothed val loss | 3.946 | 3.950 (**indistinguishable**, diff 0.004) |
 | Blind A/B preference | 36.6% of decisive | **63.4% of decisive** (p = 1.98 × 10⁻⁵) |
-| Train-val generalization gap | 0.365 | **0.067** (5.4x smaller) |
 | Compute overhead | — | **none** (identical wall-clock throughput) |
 
 Across 320 judgments from 10 independent judges (7 human, 3 foundation-model: Claude Opus 4.6, ChatGPT, Gemini 2.5 Pro), the gain-trained model is preferred by both human judges (65.3%) and foundation-model judges (59.8%). The preference is strongest on open-ended tasks (creative writing, world knowledge, conversational) and narrowest on factual recall, the one category with a small baseline lean (47.8% decisive) — consistent with the mechanism's theoretical prediction that precision weighting favors generalization over rote memorization.
