@@ -1,16 +1,16 @@
 # Precision-Weighted Training for Language Models: When Loss and Quality Diverge
 
-**Author:** Troy Corbin
-**Research assistance:** Claude (Anthropic). Claude contributed to literature connection (linking the mechanism to Predictive Coding), experimental design discussions, data analysis scripting, and drafting this manuscript. All research direction, experiments, and final decisions were made by the author.
-**Version:** 1.0 (working paper)
-**Date:** 2026-04-22
+**Author:** Troy Corbin  
+**Research assistance:** Claude (Anthropic). Claude contributed to literature connection (linking the mechanism to Predictive Coding), experimental design discussions, data analysis scripting, and drafting this manuscript. All research direction, experiments, and final decisions were made by the author.  
+**Version:** 1.0 (working paper)  
+**Date:** 2026-04-22  
 **Codebase:** Method implementation and evaluation code available at [github.com/troycorbinz/precision-weighted-training](https://github.com/troycorbinz/precision-weighted-training). The full CLLM v1.5 research repository is private; the public companion repo contains the gain function, layer-gain scaler, A/B evaluation webapp, and configuration needed to reproduce the method.
 
 ---
 
 ## Abstract
 
-Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases probing different aspects of the mechanism, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges — seven humans and three foundation models (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable. A paired ablation at 1.5B parameters (ongoing) further shows that the layer-gain mechanism depends critically on layer 0's participation in divergence normalization: excluding it causes token entropy to collapse once training exits warmup, and restoring it recovers the behavior.
+Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases probing different aspects of the mechanism, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable.
 
 The result is a training-time intervention that is optimizer-agnostic, cheap (dominated by a single elementwise multiply per step; no measured throughput impact), and produces models that humans and foundation-model judges prefer — while being invisible to the aggregate loss metric that defines most of the LLM training literature.
 
