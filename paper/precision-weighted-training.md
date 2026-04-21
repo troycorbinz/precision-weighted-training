@@ -3,14 +3,14 @@
 **Author:** Troy Corbin
 **Research assistance:** Claude (Anthropic). Claude contributed to literature connection (linking the mechanism to Predictive Coding), experimental design discussions, data analysis scripting, and drafting this manuscript. All research direction, experiments, and final decisions were made by the author.
 **Version:** 1.0 (working paper)
-**Date:** 2026-04-15
+**Date:** 2026-04-22
 **Codebase:** Method implementation and evaluation code available at [github.com/troycorbinz/precision-weighted-training](https://github.com/troycorbinz/precision-weighted-training). The full CLLM v1.5 research repository is private; the public companion repo contains the gain function, layer-gain scaler, A/B evaluation webapp, and configuration needed to reproduce the method.
 
 ---
 
 ## Abstract
 
-Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases probing different aspects of the mechanism, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges — seven humans and three foundation models (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable.
+Standard language model training applies uniform gradient weight to every token in a batch and uniform scaling to every layer in the network. We propose two composable mechanisms — **per-token precision-weighted gain** and **per-layer divergence-scaled gradients** — that together re-shape the learning signal in a manner inspired by Predictive Coding's precision-weighting framework. Across three experimental phases probing different aspects of the mechanism, we find that: (1) **mean-normalization of per-token gain is the critical property** — shape alternatives that suppress or amplify the total gradient budget degenerate training; (2) **loss and output quality diverge at scale** — in a controlled 1.2B-parameter comparison at 3.9B tokens (16.4% of Chinchilla-optimal), a gain-trained model achieves val loss statistically indistinguishable from baseline (smoothed difference 0.004), yet is preferred in **63.4% of decisive blind A/B comparisons** across 320 judgments by 10 judges — seven humans and three foundation models (p = 1.98 × 10⁻⁵, two-sided binomial); (3) **functional layer specialization emerges** under layer-gain scaling, with late-block representation divergence growing 387% across training while mid-block divergence remains stable. A paired ablation at 1.5B parameters (ongoing) further shows that the layer-gain mechanism depends critically on layer 0's participation in divergence normalization: excluding it causes token entropy to collapse once training exits warmup, and restoring it recovers the behavior.
 
 The result is a training-time intervention that is optimizer-agnostic, cheap (dominated by a single elementwise multiply per step; no measured throughput impact), and produces models that humans and foundation-model judges prefer — while being invisible to the aggregate loss metric that defines most of the LLM training literature.
 
@@ -30,9 +30,9 @@ This paper develops and empirically characterizes two training-time intervention
 
 3. **Empirical evidence that the aggregate loss metric is insufficient.** In a controlled 1.2B-parameter comparison trained on identical data in identical order for 30,000 steps (3.9B tokens), baseline and gain-trained models achieve nearly identical smoothed val loss, yet the gain model is preferred 63.4% of the time in blind pairwise comparison by a panel of seven human and three foundation-model judges. Humans and AI agree (65.3% vs 59.8% gain preference of decisive judgments). These are large, replicable signals that aggregate loss simply cannot see.
 
-**Scope and key limitations (detailed in Section 8).** The Phase 3 result is a single-seed, single-pair comparison at 16.4% of Chinchilla-optimal training. We do not ablate token gain and layer gain separately at 1.2B scale — both are combined in the gain run. The baseline did not log layer divergences, so we cannot confirm whether the observed layer specialization is caused by layer-gain scaling or would emerge under uniform training as well. The A/B evaluation uses short-form prompts only (the models are too undertrained for long-form), and the foundation-model judges may share biases from overlapping training data. These are important caveats for interpreting the strength of the claims.
+**Scope and key limitations (detailed in Section 8).** The Phase 3 result is a single-seed, single-pair comparison at 16.4% of Chinchilla-optimal training. We do not ablate token gain and layer gain separately at 1.2B scale — both are combined in the gain run. The baseline did not log layer divergences, so we cannot confirm whether the observed layer specialization is caused by layer-gain scaling or would emerge under uniform training as well. The A/B evaluation uses short-form prompts only (the models are too undertrained for long-form), and the foundation-model judges may share biases from overlapping training data. These are important caveats for interpreting the strength of the claims. A Chinchilla-scale follow-up at 1.5B parameters is in progress; an accidental paired ablation within that follow-up (Section 5.4) provides early cross-scale evidence that the layer-gain mechanism's effect depends on layer 0's participation in divergence normalization, but a full 1.5B baseline-vs-gain A/B has not yet been collected.
 
-The paper is structured as follows. Section 2 frames the work in the Predictive Coding literature. Section 3 describes both mechanisms and the config surface. Sections 4–5 report three experimental phases: mechanism-shape sensitivity at small scale (Phase 1), clamp-range sensitivity (Phase 2), and scale validation at 1.2B parameters (Phase 3). Section 6 describes the blind A/B preference evaluation in detail, including per-judge agreement and per-category breakdown. Section 7 analyses loss-quality divergence and layer-specialization emergence. Section 8 discusses limitations in full. Section 9 concludes.
+The paper is structured as follows. Section 2 frames the work in the Predictive Coding literature. Section 3 describes both mechanisms and the config surface. Sections 4–5 report three experimental phases: mechanism-shape sensitivity at small scale (Phase 1), clamp-range sensitivity (Phase 2), and scale validation at 1.2B parameters (Phase 3). Section 6 describes the blind A/B preference evaluation in detail, including per-judge agreement and per-category breakdown. Section 7 analyses loss-quality divergence, the episodic-to-semantic trade-off, and training-practicality considerations. Section 8 discusses limitations in full. Section 9 concludes.
 
 ## 2. Background: Predictive Coding and Precision Weighting
 
@@ -99,7 +99,7 @@ div = (x_out - x_in).norm() / (x_in.norm() + 1e-8)
 self._layer_divergences.append(div.item())
 ```
 
-After `loss.backward()` and before gradient clipping, the `LayerGainScaler` applies a mean-normalized scale to each block's parameter gradients. Let $d_i$ be the divergence of block $i$ and $\bar{d}$ the mean divergence across included blocks (layer 0 is excluded — see below). The scale is:
+After `loss.backward()` and before gradient clipping, the `LayerGainScaler` applies a mean-normalized scale to each block's parameter gradients. Let $d_i$ be the divergence of block $i$ and $\bar{d}$ the mean divergence across all blocks (including layer 0 — see the discussion below). The scale is:
 
 $$
 \text{scale}_i = \mathrm{clamp}\!\left(1 + \mathbf{t} \cdot \frac{d_i - \bar{d}}{\bar{d}},\, m_\min,\, m_\max\right)
@@ -118,7 +118,9 @@ for name, param in model.named_parameters():
 
 Implementation: `LayerGainScaler` class in [src/layer_gain.py](../src/layer_gain.py).
 
-**Layer 0 exclusion.** Layer 0 is structurally unique — it bridges token embeddings and transformer representations, and its forward-pass divergence is dominated by this embedding-to-representation transformation rather than ongoing refinement. Early in Phase 3 development (before the layer-0 exclusion was implemented, and with a pre-warmup scale shock that has since been corrected), layer 0's divergence ran an order of magnitude or more above the mean of the remaining layers, pulling the normalization factor $\bar{d}$ upward and systematically attenuating every other layer's gradient. With the fix in place, layer 0 still runs several-fold above the mean of other layers (see Section 5.4), but it is excluded from normalization; it trains normally with scale=1.0. This is the only hand-tuned exception; all other layers participate.
+**Scope of the per-block scale.** The prefix match applies $\text{scale}_i$ uniformly to every parameter inside block $i$ — pre-norm, attention projections (Q, K, V, O, including QK-norms), post-norm, and the FFN / MoE. Attention and FFN within a block therefore learn at a common effective rate. The divergence $d_i$ driving the scale is correspondingly compound: it measures the block's full residual contribution (attention-residual composed with FFN-residual), not the two sub-blocks independently. Precision-weighted gain at the token level also propagates through attention via normal backpropagation, in proportion to each token's participation in the gradient path. Splitting the block divergence into attention-specific and FFN-specific signals, and scaling each sub-block's gradients by its own divergence, is a natural refinement left to future work.
+
+**Role of layer 0.** Layer 0 is structurally unique — it bridges token embeddings and transformer representations, and its forward-pass divergence is dominated by this embedding-to-representation transformation rather than ongoing refinement. Across the Phase 3 gain run, layer 0's divergence sat several-fold above the mean of the other 19 layers across training (Section 5.3; full per-layer profile in Appendix D) and consistently saturated the $m_\max = 3.0$ clamp. This saturation is not a pathology — it is the signal the mechanism uses. Layer 0's high divergence inflates the normalization factor $\bar{d}$, which compresses the scales for stable mid-layers below 1.0. This implicit attenuation of layers whose representations have already settled is the mechanism's signature behavior. A paired ablation at 1.5B parameters (Section 5.4) confirmed this interpretation: excluding layer 0 from the mean computation — which we initially hypothesized would be a cleaner treatment of its saturation — caused token entropy to collapse once training entered the stable-LR phase. Restoring layer 0 participation restored the mechanism. All layers therefore participate in the mean; the $m_\max$ clamp handles layer 0's natural saturation without special casing.
 
 ### 3.3 Compositional design
 
@@ -149,7 +151,7 @@ Config surface (under `training` in the model's `config.json`):
       "enabled": true,
       "strength": 0.5,
       "min_scale": 0.1, "max_scale": 3.0,
-      "exclude_layers": [0]
+      "exclude_layers": []
     }
   }
 }
@@ -217,19 +219,7 @@ The single-point val loss at step 30,000 flatters the gain run (baseline landed 
 
 Grad norm stability is notable. The gain run's grad norm mean (2.50) is higher than baseline's (1.74), but its standard deviation is slightly *lower* (0.20 vs 0.21). The layer-gain scaling increases the total gradient magnitude without inflating variance — consistent with the claim that it redirects rather than amplifies.
 
-### 5.3 Expert utilization
-
-The 1.2B model uses a 4-expert MoE FFN with a shared (always-on) expert 0 and three routed experts {1, 2, 3} of which top-2 are selected per token.
-
-| Routed expert | Baseline final | Gain final |
-|---|---|---|
-| Expert 1 | 0.324 | 0.310 |
-| Expert 2 | 0.357 | 0.312 |
-| Expert 3 | 0.319 | 0.378 |
-
-Baseline's routing settled into a near-uniform distribution across the three routed experts. The gain model developed asymmetric routing: expert 3 is used 18.5% more often than in baseline, expert 2 13% less. Whether this represents productive specialization or imbalance is not directly measurable from routing statistics alone; the preference-evaluation results in Section 6 suggest it is productive.
-
-### 5.4 Layer divergence trajectories
+### 5.3 Layer divergence trajectories
 
 The gain run logged per-layer representation divergence every step. This is not just a training-time diagnostic — it is a direct observation of how the model allocates its representational work across depth, and how that allocation changes over training.
 
@@ -245,7 +235,7 @@ The headline finding is **continuous specialization across the full training run
 | 25,900 | 1.43 | 0.72 | 0.18 | 0.14 | 0.13 | 0.59 | 4.1× |
 | 29,900 | 1.44 | 0.71 | 0.18 | 0.14 | 0.12 | 0.60 | 4.1× |
 
-The rightmost column is L0 divided by the mean of the five sample layers shown in the table (L3, L7, L10, L15, L19). The true ratio of L0 to the mean of all 19 other layers is smaller — approximately 7.7× at step 1K, falling to ~3.9× by step 30K — because L1, L2, and L4–L6 sit well above the five sampled mid-zone layers (Appendix D has the full per-layer profile at the final step).
+The rightmost column is L0 divided by the mean of the five sample layers shown in the table (L3, L7, L10, L15, L19). The ratio against the full L1–L19 mean follows the same decay trajectory; Appendix D gives the complete per-layer profile at the final step.
 
 **Layer 3** grew from divergence 0.184 at step 1K to 0.715 at step 30K — a **288% increase** — showing clear emergent specialization. Layers 1, 2, and 3 all grew substantially over training (L1: +132%, L2: +276%, L3: +288%), indicating the early block group as a whole is where representational revision concentrates.
 
@@ -255,13 +245,39 @@ The rightmost column is L0 divided by the mean of the five sample layers shown i
 
 **Early-transitional band (L4–L6)** sits between the rapidly-growing L1–L3 and the stable middle — final divergence 0.35–0.42, a sub-band within the broader early zone rather than a separate zone.
 
-**Layer 0** remained the structural outlier (1.2–1.8 across training, sitting at 1.3–1.5 for most of the run after an early-step peak at 1.77, embedding-to-representation bridge) but ratio-wise fell from ~12× the sample-mean at step 1K to ~4× by step 10K and stabilized there, validating the decision to exclude it from normalization.
+**Layer 0** remained the structural outlier (1.2–1.8 across training, sitting at 1.3–1.5 for most of the run after an early-step peak at 1.77, embedding-to-representation bridge) but ratio-wise fell from ~12× the sample-mean at step 1K to ~4× by step 10K and stabilized there. Its consistent saturation at $m_\max = 3.0$ is the mechanism signal described in Section 3.2 — the driver of mid-layer scale compression.
 
 Three functional zones emerged over training: **early** (L0–L6, with L0 a structural outlier at 1.4, the strongly-growing L1–L3 finishing at 0.71–0.94, and an L4–L6 transitional sub-band at 0.35–0.42), **mid** (L7–L18, fluctuating between 0.09 and 0.32 with no sustained growth), and **late** (L19, growing from 0.12 to 0.60 with the rate decelerating but not yet plateaued at 30K). This tri-zone structure is not imposed architecturally — the model has no notion of zones. It emerges as a consequence of the training signal's interaction with the loss landscape. We believe the layer-gain mechanism's directed-gradient property accelerates this emergence, though we do not have a baseline comparison for layer divergences (baseline did not log them; the metric was introduced for the gain run). Percent increases are computed from unrounded W&B values; table values above are rounded to two decimals.
 
 ![Per-layer representation divergence across training, log-colored. The early zone (L0–L6) is bright throughout, with L1–L3 showing substantial growth. The mid zone (L7–L18) stays dark — these layers make small consistent adjustments. The late zone (L19) darkens at left and brightens at right, reflecting its 387% growth across training.](figures/fig1_layer_divergence.png)
 
 **Figure 1.** Layer divergence trajectory for the gain run (cllm-v1.5-026). Each cell shows `‖x_out − x_in‖ / ‖x_in‖` for one transformer block at one training step (smoothed with a 5-step window, log-scaled color). The three functional zones are annotated on the right.
+
+### 5.4 Ablation at 1.5B: layer 0 inclusion is necessary
+
+A Phase 3 scale-up to 1.5B parameters (24 layers × 1280 embedding dim, same gain configuration, same data and seed as Phase 3) was initiated as a Chinchilla-scale replication. Two consecutive runs — differing only in whether layer 0 participated in divergence-mean normalization — produced a clean accidental ablation of the mechanism.
+
+**Setup.** Both runs used identical architecture, data, seed, and scheduler. The only difference:
+
+- **cllm-v1.5-028**: `layer_gain.exclude_layers: [0]` — layer 0 removed from the normalization mean and held at scale = 1.0, based on the initial (incorrect) interpretation that layer 0's saturation at $m_\max$ was a pathology.
+- **cllm-v1.5-029**: `exclude_layers: []` — layer 0 included in the mean, matching the Phase 3 gain run (cllm-v1.5-026).
+
+Warmup was 4000 steps; the stable-LR phase began at step ~5K.
+
+**Result at matched step 7000.**
+
+| Metric | 028 (L0 excluded) | **029 (L0 included)** | 026 reference (1.2B) |
+|---|---|---|---|
+| token_entropy | 5.47 | **7.04** | 7.07 |
+| train_loss | 4.91 | 4.96 | 4.80 |
+| val_loss | 5.00 | 5.02 | 4.78 |
+| layer_gain/scale_std | 0.22 | 0.33 | 0.46 |
+
+The entropy gap between 028 and 029 at matched step and matched architecture is **+1.57 nats** — a qualitative difference, not a fluctuation. Losses are essentially unchanged between the two (0.05-nat on train, 0.02 on val), so the divergence is entropy-specific rather than a generalized degradation. 028's trajectory has the characteristic shape of a method losing its effect: entropy rose during warmup, peaked at step 5K right after warmup ended, and declined monotonically through step 7K. 029's trajectory stays in the 6.7–7.2 nat band across steps 4K–7K, tracking the shape of the 1.2B reference run 026.
+
+**Interpretation.** Layer 0's high divergence is the signal the mechanism uses, not noise to be filtered out. With layer 0 in the mean, $\bar{d}$ is inflated and the stable mid-layer scales compress below 1.0 — attenuating learning on layers whose representations have already settled. With layer 0 excluded, $\bar{d}$ drops to the mid-layer range and those layers get scales centered on 1.0; the implicit attenuation is lost, and the model defaults to logit-sharpening once training exits warmup. The `scale_std` row of the table tells the same story at the gradient level: without layer 0's participation, the spread of per-layer scales collapses by roughly one-third.
+
+**Status and limits.** 029 is still training at time of writing. The 1.5B run has not yet reached Chinchilla-optimal scale; we do not claim that the A/B preference advantage of Section 6 replicates at this scale until a completed 1.5B baseline-vs-gain comparison is collected. What the step-7K ablation does show cleanly, at a second scale and second architecture, is that **layer 0's participation in divergence normalization is necessary** for the layer-gain mechanism to function as intended. This result supersedes the "layer 0 excluded" formulation of an earlier draft of this paper and is the basis for the `exclude_layers: []` default in the public code release.
 
 ## 6. Blind A/B Preference Evaluation
 
@@ -375,17 +391,11 @@ This maps onto a well-studied dynamic in biological learning systems. Complement
 
 This is both a strength and a limitation. For systems where factual recall must be precise (a knowledge base, a retrieval system), precision-weighted gain's bias toward generalization is a cost. For systems where generalization, fluency, and diverse generation matter more — and where specific facts can be supplied via retrieval or context — it is a direct advantage. The appropriate choice depends on the deployment context.
 
-### 7.3 Emergent functional layer specialization
+### 7.3 Grad norm stability
 
-The divergence trajectories (Section 5.4) suggest that layer-gain scaling does not simply amplify existing layer-specific gradients — it actively shapes the representational role of each layer over training. The L3 and L19 growth patterns (L3 +288% across training, plateauing by ~25K; L19 +387%, still climbing though decelerating at 30K) are not noise; they are sustained, directed structural changes that emerged under the training intervention.
+A concern at step 15K in the prior Phase 3 journal was that the gain run's higher gradient variability would destabilize training. Extending to 30K resolves this: gradient norm *mean* is higher (2.50 vs 1.74) but *standard deviation* is equal or lower (0.20 vs 0.21). The layer-gain $m_\max = 3.0$ clamp absorbs layer 0's saturation without unstable growth in the aggregate norm. No instability was observed in the final 15K steps.
 
-We do not have a baseline comparison for the divergence trajectories (baseline did not log them). We cannot therefore claim that the emergence of three-zone specialization is *caused* by layer-gain scaling — it may occur in uniform training as well. What we can say is that under layer-gain scaling, the specialization is clearly present, continuing to develop at 30K steps, and co-occurring with the quality preference advantage. A same-architecture baseline with layer-divergence logging would be required to cleanly separate these.
-
-### 7.4 Grad norm stability
-
-A concern at step 15K in the prior Phase 3 journal was that the gain run's higher gradient variability would destabilize training. Extending to 30K resolves this: gradient norm *mean* is higher (2.50 vs 1.74) but *standard deviation* is equal or lower (0.20 vs 0.21). The layer 0 exclusion patch (exclude layer 0 from divergence normalization) implemented before this run was the key stabilization. No instability was observed in the final 15K steps.
-
-### 7.5 Compute cost
+### 7.4 Compute cost
 
 The per-step compute overhead of the gain function is negligible: one elementwise multiply, one batch-statistics pass (for mean and variance), and per-layer divergence logging (one norm per block during the forward pass, computed outside checkpoint scope). Memory overhead comes entirely from `reduction='none'` in the cross-entropy, which stores the per-token loss tensor (batch × seq_len floats) — roughly 32 KB per step at our config. The per-layer divergence storage is 20 floats per step.
 
@@ -393,11 +403,9 @@ There is no training-throughput penalty measured. Baseline and gain runs had mat
 
 ## 8. Discussion / Limitations
 
-**Single-pair comparison at 1.2B.** Phase 3 is a single baseline vs. gain comparison with a single random seed. Running multiple seeds was not feasible given per-run compute cost (~7.5 days on a 5090). The Phase 1 multiple-run comparison at 50M parameters partially compensates but at much smaller scale. Multiple-seed replication at 1.2B is the single most important follow-up.
+**Single pair, single seed, 16.4% of Chinchilla-optimal.** Phase 3 is a single baseline vs. gain comparison with a single random seed, trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. Running multiple seeds was not feasible given per-run compute cost (~7.5 days on a 5090). We cannot rule out that the preference advantage narrows at full Chinchilla; L19's divergence trajectory (still growing at 30K) argues against full convergence but is not conclusive. Multiple-seed replication at 1.2B and a completed full-Chinchilla run at 1.5B are the most important follow-ups.
 
-**16.4% of Chinchilla-optimal.** The gain run trained on 3.9B tokens — well short of the ~24B tokens Chinchilla would prescribe for 1.2B parameters. We cannot rule out that the preference advantage narrows at full Chinchilla. L19's divergence trajectory (still growing at 30K) argues against full convergence, but it is not conclusive.
-
-**Three AI judges across three model families.** The foundation-model judges (Opus 4.6, ChatGPT, Gemini 2.5 Pro) span Anthropic, OpenAI, and Google, which provides broader cross-validation than a single-family sample. However, all three are trained on large web corpora and may share biases from overlapping training data. Adding judges from more diverse model families (open-weight models, smaller specialist models) would further strengthen this arm.
+**Foundation-model judges may share biases.** The three foundation-model judges (Opus 4.6, ChatGPT, Gemini 2.5 Pro) span Anthropic, OpenAI, and Google, which provides broader cross-validation than a single-family sample. But all three are frontier models trained on large web corpora and may share biases from overlapping training data. Humans and AI did converge in this evaluation (65.3% vs 59.8% decisive gain preference), which is reassuring. A more rigorous follow-up would include open-weight judges with explicitly different training origins.
 
 **Category sample sizes vary.** World knowledge had only 2 questions (20 judgments across 10 judges); the 81.2% decisive gain preference in that category is striking but rests on a very small question pool. Future A/B sets should balance categories or explicitly oversample small ones to ensure per-category conclusions generalize beyond a handful of prompts.
 
@@ -406,8 +414,6 @@ There is no training-throughput penalty measured. Baseline and gain runs had mat
 **Loss divergence at scale is not a universal claim.** We demonstrate it for precision-weighted gain + layer-gain scaling on a specific model family at a specific scale. Whether it generalizes to other training interventions (label smoothing, entropy penalties, reward-model-based training) is not addressed. We suspect similar divergences exist for other interventions but have no direct evidence.
 
 **The A/B evaluation uses short-form prompts.** The preference methodology is limited by the quality of outputs the models can produce at 16.4% of Chinchilla-optimal — neither model produces coherent long-form text. A/B preference on fully trained models would be more informative but was outside our compute budget.
-
-**Foundation-model judges may share biases.** Humans and AI judges converged (65.3% vs 59.8%), but the three foundation-model judges are all frontier models trained on large web corpora. A more rigorous evaluation would include open-weight models with explicitly different training origins.
 
 ## 9. Conclusion
 
@@ -421,7 +427,7 @@ Using per-layer representation divergence as a real-time gradient scaling signal
 
 **Implications for practice.** For research or production systems where the aggregate loss differences between candidate methods are small (below ~0.1 at 1B-parameter scale), a blind A/B preference evaluation is necessary to distinguish real from illusory improvements. Aggregate loss is not telling the whole story. The gain functions described here are cheap (near-zero compute overhead), optimizer-agnostic, and composable with existing methods — they are appropriate for use in any training pipeline where diverse generation matters more than template completion.
 
-**Open questions.** (1) Does the gain advantage persist, compound, or reverse at full Chinchilla-optimal training? *A Chinchilla-scale replication using precision-weighted gain and layer-gain scaling on a ~1.5B-parameter model is currently in progress; results will appear in a follow-up.* (2) Which of the two mechanisms (token gain vs. layer gain) accounts for most of the observed advantage? (3) How does the method interact with post-training stages (SFT, RLHF)? (4) Can the layer-divergence profile be used as a principled signal for architecture decisions — e.g., allocating parameters to the zones that are doing the most work?
+**Open questions.** (1) Does the gain advantage persist, compound, or reverse at full Chinchilla-optimal training? *A Chinchilla-scale replication at ~1.5B parameters is currently in progress (cllm-v1.5-029); early results (Section 5.4) show entropy preservation consistent with the 1.2B run, and a paired ablation confirms that layer 0's participation in divergence normalization is necessary for the mechanism to hold at this scale. Full Chinchilla-scale A/B results will appear in a follow-up.* (2) Which of the two mechanisms (token gain vs. layer gain) accounts for most of the observed advantage? (3) How does the method interact with post-training stages (SFT, RLHF)? (4) Can the layer-divergence profile be used as a principled signal for architecture decisions — e.g., allocating parameters to the zones that are doing the most work?
 
 ---
 
@@ -471,6 +477,13 @@ All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs a
 |---|---|---|
 | Baseline (uniform) | cllm-v1.5-025 | cllm-v1.5-025 Baseline: 20L/1024E ~1.2B |
 | Gain (precision + layer) | cllm-v1.5-026 | cllm-v1.5-026 Gain: 20L/1024E ~1.2B |
+
+### Phase 3 scale-up (1.5B params, in progress) — Section 5.4 ablation
+
+| Variant | W&B Run ID | Display Name |
+|---|---|---|
+| L0 excluded (discontinued) | cllm-v1.5-028 | cllm-v1.5-028 prod: 24L x 1280E ~1.48B |
+| L0 included (ongoing) | cllm-v1.5-029 | cllm-v1.5-029 |
 
 ## Appendix B — Preference Evaluation Question Set (32 prompts, 7 categories)
 
@@ -528,36 +541,8 @@ Full per-layer data for all 20 layers (~300 sample points across training) is av
 
 ## Reproduction
 
-### What you can reproduce from this repository
+The method itself — per-token gain function and per-layer gradient scaler — is self-contained in this public repository ([src/gain_functions.py](../src/gain_functions.py), [src/layer_gain.py](../src/layer_gain.py)) and architecture- and optimizer-agnostic by design. See the [README](../README.md) for integration instructions and a complete training-step example.
 
-The **method itself** is fully self-contained in this public repository and can be integrated into any PyTorch transformer training loop:
+Reproducing the specific Phase 3 experiment requires the private CLLM v1.5 training infrastructure (model, 13-dataset corpus, deterministic curriculum sampler, Muon + AdamW stack) and is not directly possible from this repo. The A/B comparison webapp's batch-serving mode ([eval/ab_compare.py](../eval/ab_compare.py)) works standalone with Flask and any pre-generated response JSON.
 
-- Per-token gain function: [src/gain_functions.py](../src/gain_functions.py)
-- Per-layer gradient scaler: [src/layer_gain.py](../src/layer_gain.py)
-- Evaluation question set: [configs/eval_questions_1.2B.json](../configs/eval_questions_1.2B.json)
-- A/B comparison webapp (batch-serving mode is standalone): [eval/ab_compare.py](../eval/ab_compare.py)
-
-See the [README](../README.md) for integration instructions, including a complete training-step example using both mechanisms together.
-
-### What requires the private research repository
-
-Reproducing the **specific Phase 3 experiment** (the 1.2B-parameter, 30K-step comparison reported in Sections 5–7) requires the full CLLM v1.5 training infrastructure and its 13-dataset corpus, which are not publicly available. Specifically:
-
-- The model architecture (GPT with GQA, MoE FFN, BlockAttnRes, RoPE)
-- The 13-dataset training suite and deterministic curriculum sampler
-- The Muon + AdamW optimizer stack
-- The full training loop with WSD scheduler and checkpoint management
-
-The Phase 3 experiment is a validation of the method on a specific model at a specific scale — not the only way to test the method. The gain functions and layer-gain scaler are architecture- and optimizer-agnostic by design: integrate them into your own training pipeline using the instructions in the README, train a baseline and a gain-enabled run on the same data, and compare.
-
-### A/B preference evaluation
-
-The batch-serving mode of the evaluation webapp works standalone with Flask and any pre-generated response JSON file. The interactive and batch-generation modes use CLLM-specific model-loading code and are included as reference for the evaluation methodology, not as plug-and-play tools. To build your own evaluation:
-
-1. Generate responses from two models using your own inference code
-2. Format them into the batch JSON structure (see the webapp source for the schema)
-3. Serve with `python eval/ab_compare.py --batch <your_batch.json>`
-
-### W&B run data
-
-All training runs are logged in a private W&B project (`troy-corbin-none/Corbin-LLM`); run IDs for all phases are listed in Appendix A but are not currently accessible externally. The research-relevant metrics used in the paper — Phase 1/2 final losses, Phase 3 summary statistics, the Phase 3 loss trajectories, and the Phase 3 layer-divergence trajectory — are included as JSON files under [paper/data/](./data/), so every numerical claim in the paper can be independently verified without W&B access. See [paper/data/README.md](./data/README.md) for a map from files to paper sections.
+W&B run IDs are in Appendix A; raw training-run metrics used for every numerical claim in the paper are published as JSON under [paper/data/](./data/) (see [paper/data/README.md](./data/README.md) for a map from files to paper sections), so the numbers can be verified without W&B access.
