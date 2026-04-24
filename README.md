@@ -282,6 +282,34 @@ python eval/ab_compare.py --batch <path_to_batch_eval.json>
 
 The interactive and batch-generation modes have model-loading imports specific to CLLM and won't run outside that environment. They are included as reference for the evaluation methodology.
 
+### Judge flow
+
+1. `/` — judge enters a display name (or pseudonym), then completes an optional 5-question demographic survey (LLM usage frequency, background, primary language, age band, prior participation in language-model studies). All questions are optional; each can be left blank.
+2. The webapp assigns a deterministic per-judge RNG (seeded from `judge_id`) that draws the `(a_gen_idx, b_gen_idx, left_is_a)` pairing for each question. This avoids the modular-collision failure where linear `(q*k + jid) % n_gens` schemes produce identical responses for judges whose IDs differ by a multiple of `n_gens`.
+3. The judge is shown 32 blind pairs side-by-side and picks Left / Right / Tie.
+4. Results are stored in `ab_results.json` and demographics in `ab_demographics.json` (local JSON files, not a database).
+
+### Admin report (`/_report`)
+
+A dashboard auto-refreshing every 30 seconds, covering:
+
+- **Aggregate** — total judgments, total judges, decisive (A+B) count, A/B/tie counts, B% of decisive, two-sided binomial p-value.
+- **Sensitivity** — the headline B% re-computed under multiple filters:
+  - **FMs only** and **Humans only** — splits the panel to check whether the signal lives in both populations or is carried by one. Directly addresses the "foundation-model judges share training priors" critique.
+  - **Exclude human speed-clickers** (median vote interval <15s; FMs exempt as fast-by-nature) — removes inattentive humans.
+  - **Exclude tie-biased judges** (>80% ties) — removes judges who couldn't or wouldn't discriminate.
+  - **Exclude partial completions** (n<32) — removes judges who didn't complete, whose prompt coverage is skewed toward early questions.
+  - **Exclude all of the above** — the strictest filter.
+- **Per-judge** — one row per judge: type classification (FM/Human based on a name-marker tuple), vote counts, tie rate, B% of decisive, median seconds between votes, first/last vote timestamps. Orange highlights flag tie rate >80% or median speed <15s.
+- **Demographics** — counts for each of the 5 survey fields.
+- **Per-question coverage** — 32 rows (one per prompt) showing total votes, A/B/tie breakdown, B% of decisive, and a prompt snippet. Any question below the max vote count is highlighted to surface coverage gaps.
+- **Per-answer coverage** — `n_questions × n_models × n_generations` rows showing how often each specific generation was drawn into a pairing and how often it won or tied. Lets you verify that the per-judge RNG is producing adequate spread across generations and surface any generation that was never shown.
+- **Recent activity** — last 15 votes with judge, question #, and result.
+
+### Interpreting the sensitivity rows
+
+If the headline direction survives all filters with comparable effect magnitude, the result is not explained by low-quality judges, partial coverage, or population-specific bias. A headline that matches the signed direction of the strictest filter is a stronger claim than either row alone.
+
 ## Requirements
 
 - Python 3.10+

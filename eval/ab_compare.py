@@ -1,38 +1,42 @@
 """
-ab_compare.py — Blind A/B comparison webapp for language model evaluation.
+ab_compare.py — Blind A/B comparison webapp for two CLLM models.
 
-NOTE: This file is provided as reference for the evaluation methodology described
-in the paper. The interactive and batch-generation modes have CLLM-specific imports
-(ModelSession, inference_utils) that won't resolve outside the full CLLM repo.
-The batch-serving mode (--batch) only requires Flask and works standalone with any
-pre-generated batch JSON file.
+Two modes:
+  1. Interactive: Load models, generate responses live for ad-hoc questions
+  2. Batch eval: Serve pre-generated responses from a prepared eval set
 
-Three modes:
-  1. Interactive: Load models, generate responses live (requires CLLM)
-  2. Batch generation: Pre-generate responses from two models (requires CLLM)
-  3. Batch serving: Serve pre-generated responses to judges (standalone, Flask only)
+Usage (interactive):
+    python scripts/ab_compare.py --model-a models/cllm-v1.5-025 --model-b models/cllm-v1.5-026
 
-Usage (serve batch eval to judges — standalone):
-    pip install flask
-    python eval/ab_compare.py --batch <path_to_batch_eval.json>
-    # Then open http://localhost:8400 in a browser.
-
-Usage (interactive — requires CLLM):
-    python scripts/ab_compare.py --model-a models/model-025 --model-b models/model-026
-
-Usage (pre-generate — requires CLLM):
+Usage (pre-generate batch eval responses):
     python scripts/ab_compare.py --generate-batch \\
-        --model-a models/model-025 --model-b models/model-026 \\
+        --model-a models/cllm-v1.5-025 --model-b models/cllm-v1.5-026 \\
         --questions configs/eval_questions_1.2B.json \\
         --generations 3
+
+Usage (serve batch eval to judges):
+    python scripts/ab_compare.py --batch logs/batch_eval.json
+
+Then open http://localhost:8400 in a browser.
 """
 
 import argparse
 import json
 import random
 import hashlib
+import statistics
+import sys
+from collections import Counter, defaultdict
 from datetime import datetime
+from math import comb
 from pathlib import Path
+
+# Add project root to sys.path so `from src import ...` works regardless of
+# whether the script is launched via `python scripts/ab_compare.py` or
+# `python -m scripts.ab_compare` or from a terminal without PYTHONPATH set.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import torch
 from flask import Flask, render_template_string, request, jsonify, session as flask_session
@@ -44,11 +48,27 @@ from src.inference_utils import generate_response
 app = Flask(__name__)
 app.secret_key = "cllm-ab-compare-2026"
 
+
+@app.after_request
+def no_cache(response):
+    """Prevent CDN / browser caching of dynamic endpoints.
+
+    This app has no static content worth caching — every response reflects
+    session or state (who the judge is, how many votes have been recorded,
+    which pair to show next). Setting no-store on every response avoids
+    Cloudflare or browser caches serving stale state to judges.
+    """
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # Global state
 sessions = {}           # 'a' and 'b' ModelSessions (interactive mode)
 model_labels = {}       # maps 'a'/'b' to actual model directory names
 batch_data = None       # loaded batch eval data (batch mode)
 results_file = None     # path to results JSON
+demographics_file = None  # path to demographics JSON (per-judge survey answers)
 batch_mode = False      # True when serving pre-generated batch
 
 
@@ -194,6 +214,85 @@ def save_result(result: dict):
     results_file.write_text(json.dumps(results, indent=2))
 
 
+def load_demographics() -> dict:
+    if demographics_file and demographics_file.exists():
+        return json.loads(demographics_file.read_text())
+    return {}
+
+
+def save_demographics(judge_name: str, survey: dict):
+    if not demographics_file:
+        return
+    demographics_file.parent.mkdir(parents=True, exist_ok=True)
+    demographics = load_demographics()
+    demographics[judge_name] = {
+        'timestamp': datetime.now().isoformat(),
+        'survey': survey,
+    }
+    demographics_file.write_text(json.dumps(demographics, indent=2))
+
+
+# ─── Report helpers ──────────────────────────────────────────────────
+
+_FM_NAME_MARKERS = (
+    'chatgpt', 'gpt', 'claude', 'opus', 'sonnet', 'haiku',
+    'gemini', 'deepseek', 'minimax', 'grok', 'llama', 'qwen',
+    'kimi', 'mistral', 'command-r', 'perplexity', 'muse spark', 'muse',
+)
+
+
+def _classify_judge(name: str) -> str:
+    name_lower = name.lower()
+    return 'FM' if any(m in name_lower for m in _FM_NAME_MARKERS) else 'Human'
+
+
+def _two_sided_binomial_p(k: int, n: int, p: float = 0.5) -> float:
+    """Exact two-sided binomial test p-value for k successes in n trials."""
+    if n == 0:
+        return 1.0
+    k = min(k, n - k)
+    one_sided = sum(comb(n, i) * (p ** i) * ((1 - p) ** (n - i)) for i in range(k + 1))
+    return min(1.0, 2 * one_sided)
+
+
+def _compute_judge_stats(name: str, records: list) -> dict:
+    records = sorted(records, key=lambda r: r['timestamp'])
+    a = sum(1 for r in records if r['winner'] == 'a')
+    b = sum(1 for r in records if r['winner'] == 'b')
+    t = sum(1 for r in records if r['winner'] == 'tie')
+    decisive = a + b
+    ts = [datetime.fromisoformat(r['timestamp']) for r in records]
+    gaps = [(ts[i+1] - ts[i]).total_seconds() for i in range(len(ts) - 1)]
+    return {
+        'name': name,
+        'type': _classify_judge(name),
+        'n': len(records),
+        'a': a, 'b': b, 'ties': t,
+        'decisive': decisive,
+        'b_pct_decisive': (100 * b / decisive) if decisive else None,
+        'median_seconds': statistics.median(gaps) if gaps else None,
+        'tie_rate': (100 * t / len(records)) if records else 0,
+        'first_ts': records[0]['timestamp'][:19].replace('T', ' ') if records else '',
+        'last_ts': records[-1]['timestamp'][:19].replace('T', ' ') if records else '',
+    }
+
+
+def _compute_aggregate(records: list) -> dict:
+    a = sum(1 for r in records if r['winner'] == 'a')
+    b = sum(1 for r in records if r['winner'] == 'b')
+    t = sum(1 for r in records if r['winner'] == 'tie')
+    decisive = a + b
+    return {
+        'total': len(records),
+        'a': a, 'b': b, 'ties': t,
+        'decisive': decisive,
+        'a_pct_decisive': (100 * a / decisive) if decisive else None,
+        'b_pct_decisive': (100 * b / decisive) if decisive else None,
+        'tie_pct': (100 * t / len(records)) if records else None,
+        'p_value': _two_sided_binomial_p(min(a, b), decisive) if decisive else None,
+    }
+
+
 # ─── HTML Template ───────────────────────────────────────────────────
 
 HTML_TEMPLATE = """
@@ -203,7 +302,7 @@ HTML_TEMPLATE = """
     <title>CLLM Blind Comparison</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #161618; color: #e0e0e0; padding: 20px; }
         h1 { text-align: center; color: #7c83ff; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #666; margin-bottom: 20px; font-size: 13px; }
         .stats { text-align: center; color: #888; margin-bottom: 20px; font-size: 14px; }
@@ -211,8 +310,8 @@ HTML_TEMPLATE = """
         /* Login */
         .login-area { max-width: 400px; margin: 60px auto; text-align: center; }
         .login-area input {
-            padding: 12px; border: 1px solid #333; border-radius: 8px;
-            background: #16213e; color: #e0e0e0; font-size: 16px; width: 100%;
+            padding: 12px; border: 1px solid #2a2a30; border-radius: 8px;
+            background: #1e1e22; color: #e0e0e0; font-size: 16px; width: 100%;
             margin-bottom: 10px;
         }
         .login-area button {
@@ -223,8 +322,8 @@ HTML_TEMPLATE = """
         /* Interactive input */
         .input-area { max-width: 800px; margin: 0 auto 20px; }
         .input-area textarea {
-            width: 100%; padding: 12px; border: 1px solid #333; border-radius: 8px;
-            background: #16213e; color: #e0e0e0; font-size: 16px; resize: vertical;
+            width: 100%; padding: 12px; border: 1px solid #2a2a30; border-radius: 8px;
+            background: #1e1e22; color: #e0e0e0; font-size: 16px; resize: vertical;
             min-height: 80px;
         }
         .input-area button {
@@ -236,13 +335,14 @@ HTML_TEMPLATE = """
 
         /* Batch prompt display */
         .prompt-display {
-            max-width: 800px; margin: 0 auto 20px; padding: 15px;
-            background: #0f3460; border: 1px solid #7c83ff; border-radius: 8px;
+            max-width: 800px; margin: 0 auto 20px; padding: 15px 18px 15px 20px;
+            background: #1a2332; border-left: 4px solid #7c83ff;
+            border-radius: 4px;
             font-size: 16px; line-height: 1.5;
         }
         .prompt-label { color: #7c83ff; font-size: 12px; text-transform: uppercase; margin-bottom: 5px; }
         .progress-bar {
-            max-width: 800px; margin: 0 auto 15px; background: #16213e;
+            max-width: 800px; margin: 0 auto 15px; background: #1e1e22;
             border-radius: 8px; height: 8px; overflow: hidden;
         }
         .progress-fill { height: 100%; background: #7c83ff; transition: width 0.3s; }
@@ -251,7 +351,7 @@ HTML_TEMPLATE = """
         /* Responses */
         .responses { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; }
         .response-box {
-            flex: 1; background: #16213e; border: 1px solid #333; border-radius: 8px;
+            flex: 1; background: #1e1e22; border: 1px solid #2a2a30; border-radius: 8px;
             padding: 20px; min-height: 200px;
         }
         .response-box h2 { color: #7c83ff; margin-bottom: 10px; font-size: 18px; }
@@ -269,7 +369,7 @@ HTML_TEMPLATE = """
         }
         .tie-btn button:hover { border-color: #aaa; color: #aaa; }
 
-        .reveal { text-align: center; margin-top: 20px; padding: 15px; background: #16213e;
+        .reveal { text-align: center; margin-top: 20px; padding: 15px; background: #1e1e22;
             border-radius: 8px; max-width: 800px; margin-left: auto; margin-right: auto; }
         .reveal.winner-a { border: 2px solid #4caf50; }
         .reveal.winner-b { border: 2px solid #ff9800; }
@@ -285,7 +385,7 @@ HTML_TEMPLATE = """
         }
         .modal-overlay.active { display: flex; }
         .modal {
-            background: #16213e; border: 1px solid #7c83ff; border-radius: 12px;
+            background: #1e1e22; border: 1px solid #7c83ff; border-radius: 12px;
             padding: 30px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;
         }
         .modal h2 { color: #7c83ff; margin-bottom: 15px; text-align: center; }
@@ -294,7 +394,7 @@ HTML_TEMPLATE = """
         .modal ul { margin-left: 20px; margin-bottom: 10px; }
         .modal .criteria-item { margin-bottom: 8px; }
         .modal .criteria-label { color: #7c83ff; font-weight: bold; }
-        .modal .note { margin-top: 15px; padding: 10px; background: #0f3460; border-radius: 6px; font-size: 13px; color: #aaa; }
+        .modal .note { margin-top: 15px; padding: 10px; background: #1a2332; border-radius: 6px; font-size: 13px; color: #aaa; }
         .modal button {
             margin-top: 20px; padding: 10px 30px; background: #7c83ff; color: white;
             border: none; border-radius: 6px; font-size: 16px; cursor: pointer; width: 100%;
@@ -308,6 +408,26 @@ HTML_TEMPLATE = """
         }
         .copy-btn:hover { border-color: #7c83ff; color: #7c83ff; }
         .copy-btn.copied { border-color: #4caf50; color: #4caf50; }
+
+        /* Demographic survey */
+        #survey-area { max-width: 600px; margin: 40px auto; }
+        #survey-area h2 { color: #7c83ff; margin-bottom: 10px; text-align: center; }
+        #survey-area .survey-intro { color: #aaa; margin-bottom: 25px; font-size: 13px; text-align: center; }
+        .survey-q { margin-bottom: 18px; }
+        .survey-q label { display: block; margin-bottom: 6px; color: #e0e0e0; font-size: 14px; }
+        .survey-q select, .survey-q input[type="text"] {
+            width: 100%; padding: 10px; border: 1px solid #2a2a30; border-radius: 6px;
+            background: #1e1e22; color: #e0e0e0; font-size: 15px;
+        }
+        #survey-area button {
+            padding: 10px 30px; background: #7c83ff; color: white;
+            border: none; border-radius: 6px; font-size: 16px; cursor: pointer;
+            margin-top: 10px; width: 100%;
+        }
+        #survey-area button:hover { background: #6a70e0; }
+        #thanks-area { text-align: center; padding: 60px 20px; max-width: 600px; margin: 0 auto; }
+        #thanks-area h2 { color: #4caf50; margin-bottom: 15px; }
+        #thanks-area p { color: #aaa; font-size: 15px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -320,7 +440,69 @@ HTML_TEMPLATE = """
         <h2 style="color:#7c83ff; margin-bottom:20px;">Enter your name to begin</h2>
         <input type="text" id="judge-name" placeholder="Your name...">
         <br>
-        <button onclick="login()">Start Evaluation</button>
+        <button onclick="login()">Continue</button>
+    </div>
+
+    <!-- Demographic survey (shown after name entry) -->
+    <div id="survey-area" style="display:none;">
+        <h2>A few quick questions about you</h2>
+        <p class="survey-intro">
+            This is for demographic context in the paper. Your individual answers aren't published — only aggregate summaries (e.g., "3 of N judges were daily LLM users"). Takes under a minute. Leave any question blank if you prefer.
+        </p>
+
+        <div class="survey-q">
+            <label>How often do you use LLM chatbots (ChatGPT, Claude, Gemini, etc.)?</label>
+            <select id="s-frequency">
+                <option value="">— select —</option>
+                <option value="never">Never or almost never</option>
+                <option value="occasional">Occasionally (a few times a month)</option>
+                <option value="weekly">Weekly</option>
+                <option value="daily">Daily or near-daily</option>
+            </select>
+        </div>
+
+        <div class="survey-q">
+            <label>Technical background?</label>
+            <select id="s-background">
+                <option value="">— select —</option>
+                <option value="non-technical">Non-technical</option>
+                <option value="technical-non-ml">Technical (engineering, CS, etc.) but not ML-focused</option>
+                <option value="ml-or-cs-research">ML or CS research</option>
+            </select>
+        </div>
+
+        <div class="survey-q">
+            <label>Primary language you read/write in?</label>
+            <input type="text" id="s-language" placeholder="e.g., English">
+        </div>
+
+        <div class="survey-q">
+            <label>Age range?</label>
+            <select id="s-age">
+                <option value="">— select —</option>
+                <option value="under-25">Under 25</option>
+                <option value="25-40">25–40</option>
+                <option value="40-60">40–60</option>
+                <option value="over-60">Over 60</option>
+            </select>
+        </div>
+
+        <div class="survey-q">
+            <label>Have you participated in model evaluation or A/B preference studies before?</label>
+            <select id="s-prior">
+                <option value="">— select —</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+
+        <button onclick="submitSurvey()">Submit</button>
+    </div>
+
+    <!-- Thank-you screen (followup mode only) -->
+    <div id="thanks-area" style="display:none;">
+        <h2>Thank you!</h2>
+        <p>Your responses have been recorded. That's all I needed — no need to go through the judging interface.</p>
     </div>
 
     <!-- Batch progress -->
@@ -390,6 +572,7 @@ HTML_TEMPLATE = """
 
     <script>
         const BATCH_MODE = {{ batch_mode | tojson }};
+        const FOLLOWUP_MODE = {{ followup_mode | tojson }};
         let judgeName = '';
         let pairings = [];
         let currentIdx = 0;
@@ -408,7 +591,10 @@ HTML_TEMPLATE = """
 
         function init() {
             updateStats();
-            if (BATCH_MODE) {
+            if (FOLLOWUP_MODE) {
+                document.getElementById('mode-label').textContent = 'Follow-up Survey';
+                document.getElementById('login-area').style.display = 'block';
+            } else if (BATCH_MODE) {
                 document.getElementById('mode-label').textContent = 'Batch Evaluation Mode';
                 document.getElementById('login-area').style.display = 'block';
             } else {
@@ -421,8 +607,34 @@ HTML_TEMPLATE = """
             judgeName = document.getElementById('judge-name').value.trim();
             if (!judgeName) return;
             document.getElementById('login-area').style.display = 'none';
+            // Always go through survey first (followup or batch)
+            document.getElementById('survey-area').style.display = 'block';
+        }
 
-            // Fetch pairings first, then show guide
+        function submitSurvey() {
+            const survey = {
+                frequency: document.getElementById('s-frequency').value,
+                background: document.getElementById('s-background').value,
+                language: document.getElementById('s-language').value.trim(),
+                age: document.getElementById('s-age').value,
+                prior_studies: document.getElementById('s-prior').value,
+            };
+            fetch('/survey', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ judge_name: judgeName, survey: survey })
+            }).then(r => r.json()).then(() => {
+                document.getElementById('survey-area').style.display = 'none';
+                if (FOLLOWUP_MODE) {
+                    document.getElementById('thanks-area').style.display = 'block';
+                } else {
+                    startJudging();
+                }
+            });
+        }
+
+        function startJudging() {
+            // Fetch pairings first, then show guide (original login() behavior)
             fetch('/batch/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -607,11 +819,404 @@ HTML_TEMPLATE = """
 """
 
 
+REPORT_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>A/B Judging Report</title>
+<meta http-equiv="refresh" content="30">
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #161618; color: #e0e0e0; padding: 20px; max-width: 1300px; margin: 0 auto; }
+  h1 { color: #7c83ff; margin-bottom: 4px; }
+  .updated { color: #888; font-size: 12px; margin-bottom: 24px; }
+  .section { background: #1e1e22; border: 1px solid #2a2a30; border-radius: 6px; padding: 16px 20px; margin-bottom: 16px; }
+  .section h2 { color: #7c83ff; margin-bottom: 12px; font-size: 16px; }
+  .kv { display: flex; gap: 28px; flex-wrap: wrap; }
+  .kv-item { font-size: 14px; }
+  .kv-item .k { color: #888; }
+  .kv-item .v { color: #e0e0e0; font-weight: 600; }
+  .highlight { color: #7c83ff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #1a2332; color: #7c83ff; padding: 8px; text-align: left; border-bottom: 1px solid #2a2a30; font-weight: 600; }
+  td { padding: 6px 8px; border-bottom: 1px solid #2a2a30; }
+  tr:hover td { background: #1a2332; }
+  .type-FM { color: #6ea8b8; }
+  .type-Human { color: #e0e0e0; }
+  .numeric { text-align: right; font-variant-numeric: tabular-nums; }
+  .warn { color: #ff9800; }
+  .demo-bar { color: #ccc; font-size: 13px; margin: 5px 0; }
+  .demo-bar .label { color: #888; display: inline-block; min-width: 130px; }
+</style>
+</head>
+<body>
+  <h1>A/B Judging Report</h1>
+  <div class="updated">Updated: {{ ts_now }} &middot; auto-refreshes every 30 seconds</div>
+
+  <div class="section">
+    <h2>Aggregate</h2>
+    <div class="kv">
+      <div class="kv-item"><span class="k">Total judgments:</span> <span class="v">{{ agg.total }}</span></div>
+      <div class="kv-item"><span class="k">Judges:</span> <span class="v">{{ n_judges }}</span></div>
+      <div class="kv-item"><span class="k">Decisive (A+B):</span> <span class="v">{{ agg.decisive }}</span></div>
+      <div class="kv-item"><span class="k">A wins:</span> <span class="v">{{ agg.a }}</span></div>
+      <div class="kv-item"><span class="k">B wins:</span> <span class="v">{{ agg.b }}</span></div>
+      <div class="kv-item"><span class="k">Ties:</span> <span class="v">{{ agg.ties }}</span></div>
+      {% if agg.b_pct_decisive is not none %}
+      <div class="kv-item"><span class="k">B% of decisive:</span> <span class="v highlight">{{ "%.1f"|format(agg.b_pct_decisive) }}%</span></div>
+      <div class="kv-item"><span class="k">Two-sided binomial p:</span> <span class="v highlight">{{ "%.2e"|format(agg.p_value) }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if sensitivity %}
+  <div class="section">
+    <h2>Sensitivity</h2>
+    <table>
+      <tr><th>Filter</th><th class="numeric">Judges</th><th class="numeric">Decisive</th><th class="numeric">B%</th><th class="numeric">p-value</th></tr>
+      {% for s in sensitivity %}
+      <tr>
+        <td>{{ s.label }}</td>
+        <td class="numeric">{{ s.n_judges }}</td>
+        <td class="numeric">{{ s.decisive }}</td>
+        <td class="numeric">{% if s.b_pct_decisive is not none %}{{ "%.1f"|format(s.b_pct_decisive) }}%{% else %}&mdash;{% endif %}</td>
+        <td class="numeric">{% if s.p_value is not none %}{{ "%.2e"|format(s.p_value) }}{% else %}&mdash;{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <h2>Per-judge</h2>
+    <table>
+      <tr>
+        <th>Judge</th><th>Type</th>
+        <th class="numeric">N</th><th class="numeric">A</th><th class="numeric">B</th><th class="numeric">Tie</th>
+        <th class="numeric">Tie%</th><th class="numeric">B% dec</th><th class="numeric">Median time</th>
+        <th>First</th><th>Last</th>
+      </tr>
+      {% for j in judges %}
+      <tr>
+        <td>{{ j.name }}</td>
+        <td class="type-{{ j.type }}">{{ j.type }}</td>
+        <td class="numeric">{{ j.n }}</td>
+        <td class="numeric">{{ j.a }}</td>
+        <td class="numeric">{{ j.b }}</td>
+        <td class="numeric">{{ j.ties }}</td>
+        <td class="numeric {% if j.tie_rate > 80 %}warn{% endif %}">{{ "%.0f"|format(j.tie_rate) }}%</td>
+        <td class="numeric">{% if j.b_pct_decisive is not none %}{{ "%.1f"|format(j.b_pct_decisive) }}%{% else %}&mdash;{% endif %}</td>
+        <td class="numeric {% if j.median_seconds is not none and j.median_seconds < 15 %}warn{% endif %}">{% if j.median_seconds is not none %}{{ "%.1f"|format(j.median_seconds) }}s{% else %}&mdash;{% endif %}</td>
+        <td>{{ j.first_ts }}</td>
+        <td>{{ j.last_ts }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Demographics ({{ demo.n }} surveyed)</h2>
+    {% if demo.n == 0 %}
+    <div class="demo-bar">No demographics collected yet.</div>
+    {% else %}
+    {% for cat, items in demo.breakdown.items() %}
+    <div class="demo-bar">
+      <span class="label">{{ cat }}:</span>
+      {% for key, count in items %}{{ key or "(blank)" }} ({{ count }}){% if not loop.last %} &middot; {% endif %}{% endfor %}
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>Per-question coverage ({{ coverage_summary.n_questions }} questions, min/max votes per question: {{ coverage_summary.min }} / {{ coverage_summary.max }})</h2>
+    <table>
+      <tr>
+        <th class="numeric">Q#</th>
+        <th>Prompt (snippet)</th>
+        <th class="numeric">Votes</th>
+        <th class="numeric">A</th>
+        <th class="numeric">B</th>
+        <th class="numeric">Tie</th>
+        <th class="numeric">B% dec</th>
+      </tr>
+      {% for c in coverage %}
+      <tr>
+        <td class="numeric">{{ c.qid }}</td>
+        <td>{{ c.snippet }}</td>
+        <td class="numeric {% if c.n < coverage_summary.max %}warn{% endif %}">{{ c.n }}</td>
+        <td class="numeric">{{ c.a }}</td>
+        <td class="numeric">{{ c.b }}</td>
+        <td class="numeric">{{ c.ties }}</td>
+        <td class="numeric">{% if c.b_pct_decisive is not none %}{{ "%.0f"|format(c.b_pct_decisive) }}%{% else %}&mdash;{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Per-answer coverage ({{ answer_summary.n_answers }} unique answers, min/max shown: {{ answer_summary.min }} / {{ answer_summary.max }}{% if answer_summary.never_shown %}, <span class="warn">{{ answer_summary.never_shown }} never shown</span>{% endif %})</h2>
+    <table>
+      <tr>
+        <th class="numeric">Q#</th>
+        <th>Model</th>
+        <th class="numeric">Gen</th>
+        <th class="numeric">Shown</th>
+        <th class="numeric">Won</th>
+        <th class="numeric">Tied</th>
+        <th class="numeric">Win%</th>
+      </tr>
+      {% for a in answers %}
+      <tr>
+        <td class="numeric">{{ a.qid }}</td>
+        <td class="type-{% if a.model == 'A' %}Human{% else %}FM{% endif %}">{{ a.model }}</td>
+        <td class="numeric">{{ a.gen }}</td>
+        <td class="numeric {% if a.shown == 0 %}warn{% endif %}">{{ a.shown }}</td>
+        <td class="numeric">{{ a.won }}</td>
+        <td class="numeric">{{ a.tied }}</td>
+        <td class="numeric">{% if a.win_pct is not none %}{{ "%.0f"|format(a.win_pct) }}%{% else %}&mdash;{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Recent activity (last 15 votes)</h2>
+    <table>
+      <tr><th>When</th><th>Judge</th><th class="numeric">Q#</th><th>Result</th></tr>
+      {% for r in recent %}
+      <tr>
+        <td>{{ r.ts }}</td>
+        <td>{{ r.judge }}</td>
+        <td class="numeric">{{ r.q_id }}</td>
+        <td>{{ r.winner }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</body>
+</html>
+"""
+
+
 # ─── Flask Routes ────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    return render_template_string(HTML_TEMPLATE, batch_mode=batch_mode)
+    followup = request.args.get('followup') == '1'
+    return render_template_string(HTML_TEMPLATE, batch_mode=batch_mode, followup_mode=followup)
+
+
+@app.route('/_report')
+def admin_report():
+    results = load_results()
+    demographics = load_demographics()
+
+    by_judge = defaultdict(list)
+    for r in results:
+        by_judge[r.get('judge_name', '(unknown)')].append(r)
+    judges = [_compute_judge_stats(name, recs) for name, recs in by_judge.items()]
+    judges.sort(key=lambda j: j['first_ts'])
+
+    agg = _compute_aggregate(results)
+
+    sensitivity = []
+    fm_names = {j['name'] for j in judges if j['type'] == 'FM'}
+    human_names = {j['name'] for j in judges if j['type'] == 'Human'}
+    fast_names = {j['name'] for j in judges
+                  if j['type'] == 'Human'
+                  and j.get('median_seconds') is not None
+                  and j['median_seconds'] < 15}
+    tie_biased = {j['name'] for j in judges if j['tie_rate'] > 80}
+
+    if fm_names:
+        filt = [r for r in results if r.get('judge_name') in fm_names]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'FMs only (' + ', '.join(sorted(fm_names)) + ')',
+            'n_judges': len(fm_names),
+            **a,
+        })
+    if human_names:
+        filt = [r for r in results if r.get('judge_name') in human_names]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'Humans only',
+            'n_judges': len(human_names),
+            **a,
+        })
+
+    if fast_names:
+        filt = [r for r in results if r.get('judge_name') not in fast_names]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'Exclude human speed-clickers (median <15s; FMs exempt — fast by nature): ' + ', '.join(sorted(fast_names)),
+            'n_judges': len(judges) - len(fast_names),
+            **a,
+        })
+    if tie_biased:
+        filt = [r for r in results if r.get('judge_name') not in tie_biased]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'Exclude tie-biased (>80% ties): ' + ', '.join(sorted(tie_biased)),
+            'n_judges': len(judges) - len(tie_biased),
+            **a,
+        })
+    partials = {j['name'] for j in judges if j['n'] < 32}
+    if partials:
+        filt = [r for r in results if r.get('judge_name') not in partials]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'Exclude partial completions (n<32, fixed-order prompt-coverage bias): ' + ', '.join(sorted(partials)),
+            'n_judges': len(judges) - len(partials),
+            **a,
+        })
+    excl_all = fast_names | tie_biased | partials
+    if excl_all and excl_all not in (fast_names, tie_biased, partials):
+        filt = [r for r in results if r.get('judge_name') not in excl_all]
+        a = _compute_aggregate(filt)
+        sensitivity.append({
+            'label': 'Exclude all of the above',
+            'n_judges': len(judges) - len(excl_all),
+            **a,
+        })
+
+    demo_breakdown = {}
+    survey_items = [v.get('survey', {}) for v in demographics.values()]
+    for field in ['frequency', 'background', 'language', 'age', 'prior_studies']:
+        counts = Counter((s.get(field) or '').strip() for s in survey_items)
+        ordered = sorted([(k, n) for k, n in counts.items()], key=lambda x: -x[1])
+        demo_breakdown[field] = ordered
+
+    per_q = defaultdict(lambda: {'a': 0, 'b': 0, 'tie': 0})
+    for r in results:
+        qid = r.get('question_id', '?')
+        w = r['winner']
+        if w in ('a', 'b', 'tie'):
+            per_q[qid][w] += 1
+    q_snippets = {}
+    if batch_data:
+        for q in batch_data.get('questions', []):
+            q_snippets[q['id']] = (q.get('question') or '')[:70]
+    coverage = []
+    for qid in sorted(per_q.keys(), key=lambda x: (isinstance(x, str), x)):
+        counts = per_q[qid]
+        n = counts['a'] + counts['b'] + counts['tie']
+        dec = counts['a'] + counts['b']
+        coverage.append({
+            'qid': qid,
+            'snippet': q_snippets.get(qid, ''),
+            'n': n,
+            'a': counts['a'],
+            'b': counts['b'],
+            'ties': counts['tie'],
+            'b_pct_decisive': (100 * counts['b'] / dec) if dec else None,
+        })
+    cov_counts = [c['n'] for c in coverage]
+    coverage_summary = {
+        'min': min(cov_counts) if cov_counts else 0,
+        'max': max(cov_counts) if cov_counts else 0,
+        'n_questions': len(coverage),
+    }
+
+    # Per-answer coverage: one row per (question_id, model, gen_idx).
+    # Each judgment exposes exactly one A-answer and one B-answer.
+    ans_counts = defaultdict(lambda: {'shown': 0, 'won': 0, 'tied': 0})
+    for r in results:
+        qid = r.get('question_id', '?')
+        a_gen = r.get('a_gen_idx')
+        b_gen = r.get('b_gen_idx')
+        w = r['winner']
+        if a_gen is not None:
+            key = (qid, 'A', a_gen)
+            ans_counts[key]['shown'] += 1
+            if w == 'a':
+                ans_counts[key]['won'] += 1
+            elif w == 'tie':
+                ans_counts[key]['tied'] += 1
+        if b_gen is not None:
+            key = (qid, 'B', b_gen)
+            ans_counts[key]['shown'] += 1
+            if w == 'b':
+                ans_counts[key]['won'] += 1
+            elif w == 'tie':
+                ans_counts[key]['tied'] += 1
+    answers = []
+    for (qid, model, gen), c in sorted(ans_counts.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2])):
+        shown = c['shown']
+        answers.append({
+            'qid': qid,
+            'model': model,
+            'gen': gen,
+            'shown': shown,
+            'won': c['won'],
+            'tied': c['tied'],
+            'win_pct': (100 * c['won'] / shown) if shown else None,
+        })
+    ans_shown = [a['shown'] for a in answers]
+    answer_summary = {
+        'n_answers': len(answers),
+        'min': min(ans_shown) if ans_shown else 0,
+        'max': max(ans_shown) if ans_shown else 0,
+        'never_shown': 0,
+    }
+    if batch_data:
+        n_gens = batch_data['metadata'].get('n_generations', 0)
+        expected_keys = set()
+        for q in batch_data.get('questions', []):
+            for g in range(n_gens):
+                expected_keys.add((q['id'], 'A', g))
+                expected_keys.add((q['id'], 'B', g))
+        actual_keys = set(ans_counts.keys())
+        never = expected_keys - actual_keys
+        for (qid, model, gen) in sorted(never, key=lambda x: (x[0], x[1], x[2])):
+            answers.append({
+                'qid': qid, 'model': model, 'gen': gen,
+                'shown': 0, 'won': 0, 'tied': 0, 'win_pct': None,
+            })
+        answer_summary['never_shown'] = len(never)
+        answer_summary['n_answers'] = len(expected_keys)
+        if never:
+            answer_summary['min'] = 0
+        answers.sort(key=lambda a: (a['qid'], a['model'], a['gen']))
+
+    sorted_results = sorted(results, key=lambda r: r['timestamp'], reverse=True)
+    winner_label = {'a': 'A (baseline)', 'b': 'B (gain)', 'tie': 'Tie'}
+    recent = [{
+        'ts': r['timestamp'][:19].replace('T', ' '),
+        'judge': r.get('judge_name', '?'),
+        'q_id': r.get('question_id', '?'),
+        'winner': winner_label.get(r['winner'], r['winner']),
+    } for r in sorted_results[:15]]
+
+    return render_template_string(
+        REPORT_TEMPLATE,
+        ts_now=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        agg=agg,
+        n_judges=len(judges),
+        judges=judges,
+        sensitivity=sensitivity,
+        demo={'n': len(demographics), 'breakdown': demo_breakdown},
+        coverage=coverage,
+        coverage_summary=coverage_summary,
+        answers=answers,
+        answer_summary=answer_summary,
+        recent=recent,
+    )
+
+
+@app.route('/followup')
+def followup_page():
+    return render_template_string(HTML_TEMPLATE, batch_mode=batch_mode, followup_mode=True)
+
+
+@app.route('/survey', methods=['POST'])
+def survey():
+    data = request.json or {}
+    judge_name = (data.get('judge_name') or '').strip()
+    if not judge_name:
+        return jsonify({'ok': False, 'error': 'missing judge_name'}), 400
+    save_demographics(judge_name, data.get('survey', {}))
+    return jsonify({'ok': True})
 
 
 # ── Batch mode routes ──
@@ -826,6 +1431,7 @@ if __name__ == '__main__':
             parser.error(f"Batch file not found: {args.batch}")
         batch_data = json.loads(batch_path.read_text(encoding='utf-8'))
         results_file = Path("logs/ab_batch_results.json")
+        demographics_file = Path("logs/ab_demographics.json")
 
         meta = batch_data["metadata"]
         print(f"Batch Eval Mode")
@@ -845,6 +1451,7 @@ if __name__ == '__main__':
 
         batch_mode = False
         results_file = Path("logs/ab_results.json")
+        demographics_file = Path("logs/ab_demographics.json")
         model_labels['a'] = Path(args.model_a).name
         model_labels['b'] = Path(args.model_b).name
 
