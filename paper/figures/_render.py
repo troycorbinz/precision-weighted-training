@@ -138,111 +138,153 @@ def render_fig1():
     plt.close(fig)
 
 
-# ─── Figure 2: Train-val gap ──────────────────────────────────────────
+# ─── Figure 2: Loss-vs-preference (the paper's central claim) ─────────
 
 def render_fig2():
-    data = json.loads((HERE / '_data_fig2.json').read_text())
-    bl = data['baseline_025']
-    gn = data['gain_026']
+    """Render the two-panel loss-vs-preference figure for §6.2."""
+    data = json.loads((HERE / 'fig2_data.json').read_text())
+    pa = data['panel_a_loss_curves']
+    pb = data['panel_b_preference']
 
-    def series(rows, key):
-        rows = [r for r in rows if r.get(key) is not None]
-        rows.sort(key=lambda r: r['_step'])
-        steps = np.array([r['_step'] for r in rows])
-        vals = np.array([r[key] for r in rows], dtype=float)
-        return steps, vals
+    bl_traj = pa['baseline']['trajectory']
+    gn_traj = pa['gain']['trajectory']
+    bl_steps = np.array([p['step'] for p in bl_traj])
+    bl_vals = np.array([p['val_loss_smoothed'] for p in bl_traj])
+    gn_steps = np.array([p['step'] for p in gn_traj])
+    gn_vals = np.array([p['val_loss_smoothed'] for p in gn_traj])
 
-    bl_tr_x, bl_tr_y = series(bl, 'train_loss')
-    bl_va_x, bl_va_y = series(bl, 'val_loss')
-    gn_tr_x, gn_tr_y = series(gn, 'train_loss')
-    gn_va_x, gn_va_y = series(gn, 'val_loss')
+    bl_color = '#777777'
+    gn_color = '#7c83ff'
 
-    # Smooth with EMA (alpha=0.15 is typical for training curves)
-    bl_tr_s = ema(bl_tr_y, 0.2)
-    bl_va_s = ema(bl_va_y, 0.2)
-    gn_tr_s = ema(gn_tr_y, 0.2)
-    gn_va_s = ema(gn_va_y, 0.2)
+    fig = plt.figure(figsize=(11.5, 5.4))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.22,
+                          left=0.07, right=0.97, top=0.78, bottom=0.12)
+    ax_l = fig.add_subplot(gs[0, 0])
+    ax_r = fig.add_subplot(gs[0, 1])
 
-    # Two-panel layout: top shows curves, bottom shows gap
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9.0, 6.8),
-                                    gridspec_kw={'height_ratios': [2.3, 1]},
-                                    sharex=True)
+    # ── Left panel: smoothed val-loss curves ──
+    ax_l.plot(bl_steps, bl_vals, color=bl_color, lw=2.0,
+              label=pa['baseline']['label'])
+    ax_l.plot(gn_steps, gn_vals, color=gn_color, lw=2.0,
+              label=pa['gain']['label'])
+    # Endpoint dots so the reader can see both lines reach step 30K
+    ax_l.plot(bl_steps[-1], bl_vals[-1], 'o', color=bl_color, ms=4)
+    ax_l.plot(gn_steps[-1], gn_vals[-1], 'o', color=gn_color, ms=4)
 
-    bl_color = '#2E5E8E'
-    gn_color = '#C84A3D'
+    # Endpoint value labels with a Δ bracket
+    final_bl = bl_vals[-1]
+    final_gn = gn_vals[-1]
+    end_x = bl_steps[-1]
+    ax_l.annotate(f'{final_gn:.3f}', xy=(end_x, final_gn),
+                  xytext=(8, 4), textcoords='offset points',
+                  color=gn_color, fontsize=9, fontweight='bold',
+                  va='bottom', ha='left')
+    ax_l.annotate(f'{final_bl:.3f}', xy=(end_x, final_bl),
+                  xytext=(8, -4), textcoords='offset points',
+                  color=bl_color, fontsize=9, fontweight='bold',
+                  va='top', ha='left')
+    # Δ bracket: tiny vertical bracket spanning the two endpoints
+    bracket_x = end_x + 1100
+    ax_l.plot([bracket_x, bracket_x + 250, bracket_x + 250, bracket_x],
+              [final_gn, final_gn, final_bl, final_bl],
+              color='#333', lw=0.8, clip_on=False)
+    ax_l.text(bracket_x + 600, (final_gn + final_bl) / 2,
+              r'$\Delta = 0.004$',
+              fontsize=9, color='#333', va='center', ha='left',
+              clip_on=False)
 
-    # ── Top panel: smoothed loss curves ──
-    # Light raw lines underneath
-    ax1.plot(bl_tr_x, bl_tr_y, color=bl_color, lw=0.6, alpha=0.18)
-    ax1.plot(bl_va_x, bl_va_y, color=bl_color, lw=0.6, alpha=0.18)
-    ax1.plot(gn_tr_x, gn_tr_y, color=gn_color, lw=0.6, alpha=0.18)
-    ax1.plot(gn_va_x, gn_va_y, color=gn_color, lw=0.6, alpha=0.18)
-    # Smoothed prominent lines
-    ax1.plot(bl_tr_x, bl_tr_s, color=bl_color, lw=1.4, linestyle='--',
-             label='Baseline · train')
-    ax1.plot(bl_va_x, bl_va_s, color=bl_color, lw=2.2,
-             label='Baseline · val')
-    ax1.plot(gn_tr_x, gn_tr_s, color=gn_color, lw=1.4, linestyle='--',
-             label='Gain · train')
-    ax1.plot(gn_va_x, gn_va_s, color=gn_color, lw=2.2,
-             label='Gain · val')
+    ax_l.set_xlabel('Training step')
+    ax_l.set_ylabel('Smoothed val loss')
+    ax_l.set_title('Validation loss is the same\n'
+                   f'Baseline {final_bl:.3f} · Gain {final_gn:.3f} · '
+                   f'difference {abs(final_gn - final_bl):.3f} nats',
+                   loc='left', pad=10)
+    ax_l.set_xlim(0, 31000)
+    ax_l.set_ylim(pa['y_range_suggested'][0], pa['y_range_suggested'][1])
+    ax_l.xaxis.set_major_locator(MultipleLocator(5000))
+    ax_l.xaxis.set_major_formatter(
+        FuncFormatter(lambda x, _: '500' if x == 500 else f'{int(x / 1000):,}K' if x >= 1000 else f'{int(x)}'))
+    ax_l.set_xticks([500, 5000, 10000, 15000, 20000, 25000, 30000])
+    ax_l.grid(axis='y', alpha=0.22, linestyle='--', linewidth=0.5)
+    ax_l.legend(loc='upper right', handlelength=2.2)
 
-    # Shade the final gap region for each model (last 10% of training)
-    tail_mask_bl = bl_tr_x >= 27000
-    tail_mask_gn = gn_tr_x >= 27000
-    if tail_mask_bl.any():
-        ax1.fill_between(bl_tr_x[tail_mask_bl], bl_tr_s[tail_mask_bl],
-                         bl_va_s[tail_mask_bl], color=bl_color, alpha=0.18,
-                         linewidth=0)
-    if tail_mask_gn.any():
-        ax1.fill_between(gn_tr_x[tail_mask_gn], gn_tr_s[tail_mask_gn],
-                         gn_va_s[tail_mask_gn], color=gn_color, alpha=0.18,
-                         linewidth=0)
+    # ── Right panel: stacked decisive bar + sensitivity whisker ──
+    bl_pct = pb['breakdown_of_decisive']['baseline_pct']
+    gn_pct = pb['breakdown_of_decisive']['gain_pct']
+    bl_bar_color = pb['breakdown_of_decisive']['baseline_color_hex']
+    gn_bar_color = pb['breakdown_of_decisive']['gain_color_hex']
+    band = pb['sensitivity_band']
+    band_min = band['min_pct']
+    band_max = band['max_pct']
+    headline = band['headline_pct']
 
-    ax1.set_ylabel('Loss')
-    ax1.set_title('Train vs validation loss — gain reduces memorization at matched training cost\n'
-                  '5.4× smaller train–val gap at 30K steps',
-                  loc='left', pad=12)
-    ax1.set_ylim(3.3, 9.5)
-    ax1.legend(loc='upper right', ncol=2, columnspacing=1.8, handlelength=2.2)
-    ax1.grid(axis='y', alpha=0.22, linestyle='--', linewidth=0.5)
+    bar_y = 0.78
+    bar_h = 0.18
+    whisker_y = 0.42
 
-    # ── Bottom panel: train-val gap over time ──
-    # Compute gap using smoothed series, interpolated to shared x
-    def interp_gap(tx, ty, vx, vy):
-        # Interpolate val onto train x grid
-        vy_on_tx = np.interp(tx, vx, vy)
-        return tx, vy_on_tx - ty
+    # Stacked decisive bar (40.1% baseline | 59.9% gain)
+    ax_r.barh(bar_y, bl_pct, height=bar_h, left=0,
+              color=bl_bar_color, edgecolor='none')
+    ax_r.barh(bar_y, gn_pct, height=bar_h, left=bl_pct,
+              color=gn_bar_color, edgecolor='none')
 
-    bl_gap_x, bl_gap_y = interp_gap(bl_tr_x, bl_tr_s, bl_va_x, bl_va_s)
-    gn_gap_x, gn_gap_y = interp_gap(gn_tr_x, gn_tr_s, gn_va_x, gn_va_s)
+    # In-bar labels
+    ax_r.text(bl_pct / 2, bar_y, f'{bl_pct:.1f}% baseline',
+              va='center', ha='center', color='white', fontsize=10,
+              fontweight='bold')
+    ax_r.text(bl_pct + gn_pct / 2, bar_y, f'{gn_pct:.1f}% gain',
+              va='center', ha='center', color='white', fontsize=10,
+              fontweight='bold')
 
-    ax2.axhline(0, color='#888', lw=0.6, linestyle='-', alpha=0.5)
-    ax2.fill_between(bl_gap_x, 0, bl_gap_y, color=bl_color, alpha=0.20, lw=0)
-    ax2.fill_between(gn_gap_x, 0, gn_gap_y, color=gn_color, alpha=0.20, lw=0)
-    ax2.plot(bl_gap_x, bl_gap_y, color=bl_color, lw=2.0, label='Baseline')
-    ax2.plot(gn_gap_x, gn_gap_y, color=gn_color, lw=2.0, label='Gain')
+    # Sensitivity-filter whisker
+    ax_r.plot([band_min, band_max], [whisker_y, whisker_y],
+              color='#333', lw=1.6, solid_capstyle='butt')
+    # End caps
+    cap_h = 0.04
+    for x in (band_min, band_max):
+        ax_r.plot([x, x], [whisker_y - cap_h, whisker_y + cap_h],
+                  color='#333', lw=1.6)
+    # Headline tick (vertical, brand color)
+    ax_r.plot([headline, headline],
+              [whisker_y - cap_h * 1.3, whisker_y + cap_h * 1.3],
+              color=gn_color, lw=2.4)
+    # Only label the min and max — the headline (59.9%) is already
+    # prominent in the stacked bar above, and the brand-color tick marks
+    # its position on the whisker. Three labels in a 4-point-wide band
+    # collide; two labels with horizontal anchoring don't.
+    label_y = whisker_y + cap_h + 0.030
+    ax_r.text(band_min, label_y, f'{band_min:.1f}% ',
+              va='bottom', ha='right', fontsize=9, color='#333')
+    ax_r.text(band_max, label_y, f' {band_max:.1f}%',
+              va='bottom', ha='left', fontsize=9, color='#333')
+    ax_r.text((band_min + band_max) / 2, whisker_y - cap_h - 0.030,
+              'Range across all sensitivity filters',
+              va='top', ha='center', fontsize=8.5, color='#555',
+              fontstyle='italic')
 
-    # Annotate final gaps
-    final_bl = bl_gap_y[-1]
-    final_gn = gn_gap_y[-1]
-    ax2.annotate(f'+{final_bl:.3f}', xy=(bl_gap_x[-1], final_bl),
-                 xytext=(5, 0), textcoords='offset points', va='center',
-                 color=bl_color, fontsize=9, fontweight='bold')
-    ax2.annotate(f'+{final_gn:.3f}', xy=(gn_gap_x[-1], final_gn),
-                 xytext=(5, 0), textcoords='offset points', va='center',
-                 color=gn_color, fontsize=9, fontweight='bold')
+    # Chance reference line at 50%
+    ax_r.axvline(50, color='#555', lw=0.9, linestyle='--', ymin=0.05, ymax=0.95)
+    ax_r.text(50, 0.06, 'Chance', va='center', ha='center', fontsize=8.5,
+              color='#555',
+              bbox=dict(boxstyle='round,pad=0.25', fc='white',
+                        ec='none'))
 
-    ax2.set_ylabel('Gap (val − train)')
-    ax2.set_xlabel('Training step')
-    ax2.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{int(x/1000)}K'))
-    ax2.xaxis.set_major_locator(MultipleLocator(5000))
-    ax2.set_xlim(0, 31500)
-    ax2.legend(loc='upper left', handlelength=2.2)
-    ax2.grid(axis='y', alpha=0.22, linestyle='--', linewidth=0.5)
+    ax_r.set_xlim(0, 100)
+    ax_r.set_ylim(0, 1)
+    ax_r.set_xlabel('Percent of decisive judgments')
+    ax_r.set_yticks([])
+    ax_r.spines['left'].set_visible(False)
+    ax_r.set_title('Blind A/B preference is decisively for gain\n'
+                   '1,181 judgments · 42 judges (29 humans + 13 FMs, 11 vendors) · '
+                   r'p = 2.80 × 10$^{-8}$',
+                   loc='left', pad=10)
+    ax_r.xaxis.set_major_locator(MultipleLocator(20))
 
-    fig.tight_layout()
-    out = HERE / 'fig2_train_val_gap.png'
+    # Suptitle banner across both panels (positioned via subplots_adjust above)
+    fig.suptitle('Aggregate val loss says nothing changed; 42 blind judges said something changed.',
+                 fontsize=13, fontweight='bold', y=0.96, x=0.5)
+
+    out = HERE / 'fig2_loss_vs_preference.png'
     fig.savefig(out)
     print(f'Saved {out}')
     plt.close(fig)
@@ -250,3 +292,4 @@ def render_fig2():
 
 if __name__ == '__main__':
     render_fig1()
+    render_fig2()
