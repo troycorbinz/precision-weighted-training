@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "snapshot_date": "2026-04-27",
   "model_a": "cllm-v1.5-025",
   "model_b": "cllm-v1.5-026",
@@ -676,14 +676,14 @@
     {
       "label": "Humans only",
       "n_judges": 29,
-      "n": 0,
-      "a": 0,
-      "b": 0,
-      "t": 0,
-      "decisive": 0,
-      "b_pct_decisive": null,
-      "tie_pct": null,
-      "p_value": 1.0
+      "n": 765,
+      "a": 196,
+      "b": 300,
+      "t": 269,
+      "decisive": 496,
+      "b_pct_decisive": 60.48,
+      "tie_pct": 35.16,
+      "p_value": 3.4684180932874554e-06
     },
     {
       "label": "Exclude human speed-clickers (median <15s; FMs exempt)",
@@ -698,14 +698,14 @@
         "H9"
       ],
       "n_judges": 34,
-      "n": 1181,
-      "a": 314,
-      "b": 470,
-      "t": 397,
-      "decisive": 784,
-      "b_pct_decisive": 59.95,
-      "tie_pct": 33.62,
-      "p_value": 2.8015280464846255e-08
+      "n": 982,
+      "a": 238,
+      "b": 401,
+      "t": 343,
+      "decisive": 639,
+      "b_pct_decisive": 62.75,
+      "tie_pct": 34.93,
+      "p_value": 1.1720179198123416e-10
     },
     {
       "label": "Exclude tie-biased judges (>80% ties)",
@@ -717,14 +717,14 @@
         "H7"
       ],
       "n_judges": 37,
-      "n": 1149,
-      "a": 314,
-      "b": 468,
-      "t": 367,
-      "decisive": 782,
-      "b_pct_decisive": 59.85,
-      "tie_pct": 31.94,
-      "p_value": 4.056439155035214e-08
+      "n": 1051,
+      "a": 308,
+      "b": 464,
+      "t": 279,
+      "decisive": 772,
+      "b_pct_decisive": 60.1,
+      "tie_pct": 26.55,
+      "p_value": 2.181185423335721e-08
     },
     {
       "label": "Exclude partial completions (n<32)",
@@ -738,14 +738,14 @@
         "H9"
       ],
       "n_judges": 35,
-      "n": 1181,
-      "a": 314,
-      "b": 470,
-      "t": 397,
-      "decisive": 784,
-      "b_pct_decisive": 59.95,
-      "tie_pct": 33.62,
-      "p_value": 2.8015280464846255e-08
+      "n": 1120,
+      "a": 297,
+      "b": 451,
+      "t": 372,
+      "decisive": 748,
+      "b_pct_decisive": 60.29,
+      "tie_pct": 33.21,
+      "p_value": 1.9838133266966572e-08
     },
     {
       "label": "Exclude all of the above (strictest)",
@@ -767,14 +767,14 @@
         "H9"
       ],
       "n_judges": 27,
-      "n": 1149,
-      "a": 314,
-      "b": 468,
-      "t": 367,
-      "decisive": 782,
-      "b_pct_decisive": 59.85,
-      "tie_pct": 31.94,
-      "p_value": 4.056439155035214e-08
+      "n": 864,
+      "a": 230,
+      "b": 394,
+      "t": 240,
+      "decisive": 624,
+      "b_pct_decisive": 63.14,
+      "tie_pct": 27.78,
+      "p_value": 5.2956086984319525e-11
     }
   ],
   "category_breakdown": {

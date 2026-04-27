@@ -14,7 +14,7 @@
 
 The intervention has two composable parts: a **per-token precision-weighted gain** that redistributes gradient toward surprising tokens (mean-normalized at construction), and a **per-layer divergence-scaled gradient** that amplifies learning where representations are actively revising. Both are cheap (no measured throughput impact) and optimizer-agnostic. Three findings carry through three experimental phases from 50M to 1.2B parameters: (1) **mean-normalization is the critical property** — gain functions that shift the mean loss weight away from 1.0 degenerate training; (2) **loss and output quality diverge at scale**, which is the headline above; (3) **functional layer specialization emerges** under divergence-scaled gradients, with late-block representation divergence growing 387% across training while mid-block stays stable.
 
-The methodological takeaway is as load-bearing as the mechanism: at the parameter and token scales we tested, **aggregate val loss is not sufficient to distinguish a real improvement from no improvement at all**; a quality difference large enough for a 42-judge blind panel — 29 human volunteers, including the author, and 13 foundation-model judges spanning eleven vendors — to agree on across in-person and open online recruitment was completely invisible to it.
+The methodological takeaway is as load-bearing as the mechanism: at the parameter and token scales we tested, **aggregate val loss is not sufficient to distinguish a real improvement from no improvement at all**. A 42-judge blind panel — 29 human volunteers (including the author) and 13 foundation-model judges spanning eleven vendors, recruited both in person and through open online posts — agreed on a quality difference that aggregate loss could not see.
 
 ---
 
@@ -310,6 +310,10 @@ Judges were asked to evaluate all 32 pairings; 35 of 42 completed all 32, the re
 |---|---|---|---|
 | Total | 314 (26.6%) | **470 (39.8%)** | 397 (33.6%) |
 | Of decisive (N = 784) | 40.1% | **59.9%** | — |
+
+![Two-panel figure. Left: smoothed validation loss across 30,000 training steps for the baseline and gain runs; the two curves converge to within 0.004 nats (3.946 vs 3.950) and are visually overlapping from step ~5,000 onward. Right: stacked horizontal bar showing 40.1% baseline / 59.9% gain across 784 decisive blind judgments, with a whisker beneath spanning 59.0% to 63.1% — the range of B%-decisive across all sensitivity filters — and a vertical reference line at 50% chance.](figures/fig2_loss_vs_preference.png)
+
+**Figure 2.** Aggregate validation loss is the same; blind A/B preference is decisively for gain. *Left:* smoothed val-loss trajectories of the baseline (cllm-v1.5-025) and gain (cllm-v1.5-026) runs across 30,000 training steps converge to within 0.004 nats and are visually indistinguishable from ~step 5,000 onward. *Right:* 1,181 blind A/B judgments by a 42-judge panel split 40.1% / 59.9% on the 784-decisive subset (p = 2.80 × 10⁻⁸); the whisker spans the B%-decisive range across all sensitivity filters (59.0% FMs only → 63.1% strictest exclusion). Source data: [paper/data/phase3_loss_trajectories.json](data/phase3_loss_trajectories.json) and [paper/data/phase3_ab_preference.json](data/phase3_ab_preference.json).
 
 Two-sided binomial test against H₀: p = 0.5 on decisive judgments: **p = 2.80 × 10⁻⁸** — significant several orders of magnitude past the conventional α = 0.001 threshold. An earlier 10-judge cut of the same data (the author, six in-person volunteers, and three foundation-model judges) reached 63.4% decisive at p = 1.98 × 10⁻⁵; growing the panel to 42 judges narrowed the headline by ~3.5 points — consistent with regression toward a steady-state estimate as more diverse raters and more random pairings are sampled — and gained the p-value three orders of magnitude as N grew. The tie rate also rose from 20.6% to 33.6%, driven mostly by less-engaged volunteer raters (Section 6.3 discusses this).
 

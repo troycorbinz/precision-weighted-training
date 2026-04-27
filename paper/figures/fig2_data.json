@@ -1,0 +1,608 @@
+{
+  "figure": "fig2_loss_vs_preference",
+  "description": "Two-panel figure for the paper's central claim. Left panel: smoothed validation-loss trajectories of the baseline run (cllm-v1.5-025) and the gain run (cllm-v1.5-026) over 30,000 training steps; they converge to within 0.004 of each other. Right panel: blind A/B preference outcome across 1,181 judgments by a 42-judge blind panel, with the sensitivity-filter range shown as an error band around the headline.",
+  "panel_a_loss_curves": {
+    "title": "Validation loss is the same",
+    "subtitle": "Baseline and gain runs converge to within 0.004 nats (smoothed, last-10-checkpoint rolling mean)",
+    "x_label": "Training step",
+    "y_label": "Smoothed validation loss",
+    "x_range": [
+      500,
+      30000
+    ],
+    "y_range_suggested": [
+      3.5,
+      9.0
+    ],
+    "baseline": {
+      "run_id": "cllm-v1.5-025",
+      "label": "Baseline (uniform CE)",
+      "color_hex": "#777777",
+      "linestyle": "solid",
+      "trajectory": [
+        {
+          "step": 500,
+          "val_loss_smoothed": 8.2629
+        },
+        {
+          "step": 1000,
+          "val_loss_smoothed": 7.9052
+        },
+        {
+          "step": 1500,
+          "val_loss_smoothed": 7.694
+        },
+        {
+          "step": 2000,
+          "val_loss_smoothed": 7.543
+        },
+        {
+          "step": 2500,
+          "val_loss_smoothed": 7.3427
+        },
+        {
+          "step": 3000,
+          "val_loss_smoothed": 7.1727
+        },
+        {
+          "step": 3500,
+          "val_loss_smoothed": 7.0021
+        },
+        {
+          "step": 4000,
+          "val_loss_smoothed": 6.8602
+        },
+        {
+          "step": 4500,
+          "val_loss_smoothed": 6.7395
+        },
+        {
+          "step": 5000,
+          "val_loss_smoothed": 6.6144
+        },
+        {
+          "step": 5500,
+          "val_loss_smoothed": 6.345
+        },
+        {
+          "step": 6000,
+          "val_loss_smoothed": 6.1185
+        },
+        {
+          "step": 6500,
+          "val_loss_smoothed": 5.8991
+        },
+        {
+          "step": 7000,
+          "val_loss_smoothed": 5.6776
+        },
+        {
+          "step": 7500,
+          "val_loss_smoothed": 5.5077
+        },
+        {
+          "step": 8000,
+          "val_loss_smoothed": 5.3834
+        },
+        {
+          "step": 8500,
+          "val_loss_smoothed": 5.2424
+        },
+        {
+          "step": 9000,
+          "val_loss_smoothed": 5.133
+        },
+        {
+          "step": 9500,
+          "val_loss_smoothed": 5.0056
+        },
+        {
+          "step": 10000,
+          "val_loss_smoothed": 4.9282
+        },
+        {
+          "step": 10500,
+          "val_loss_smoothed": 4.8321
+        },
+        {
+          "step": 11000,
+          "val_loss_smoothed": 4.7738
+        },
+        {
+          "step": 11500,
+          "val_loss_smoothed": 4.7247
+        },
+        {
+          "step": 12000,
+          "val_loss_smoothed": 4.6847
+        },
+        {
+          "step": 12500,
+          "val_loss_smoothed": 4.6521
+        },
+        {
+          "step": 13000,
+          "val_loss_smoothed": 4.5605
+        },
+        {
+          "step": 13500,
+          "val_loss_smoothed": 4.5379
+        },
+        {
+          "step": 14000,
+          "val_loss_smoothed": 4.4663
+        },
+        {
+          "step": 14500,
+          "val_loss_smoothed": 4.4604
+        },
+        {
+          "step": 15000,
+          "val_loss_smoothed": 4.4048
+        },
+        {
+          "step": 16000,
+          "val_loss_smoothed": 4.3426
+        },
+        {
+          "step": 16500,
+          "val_loss_smoothed": 4.273
+        },
+        {
+          "step": 17000,
+          "val_loss_smoothed": 4.2247
+        },
+        {
+          "step": 17500,
+          "val_loss_smoothed": 4.1829
+        },
+        {
+          "step": 18000,
+          "val_loss_smoothed": 4.1267
+        },
+        {
+          "step": 18500,
+          "val_loss_smoothed": 4.1169
+        },
+        {
+          "step": 19000,
+          "val_loss_smoothed": 4.0758
+        },
+        {
+          "step": 19500,
+          "val_loss_smoothed": 4.0692
+        },
+        {
+          "step": 20000,
+          "val_loss_smoothed": 4.0305
+        },
+        {
+          "step": 20500,
+          "val_loss_smoothed": 4.0057
+        },
+        {
+          "step": 21000,
+          "val_loss_smoothed": 4.0295
+        },
+        {
+          "step": 21500,
+          "val_loss_smoothed": 4.0315
+        },
+        {
+          "step": 22000,
+          "val_loss_smoothed": 4.0115
+        },
+        {
+          "step": 22500,
+          "val_loss_smoothed": 3.9858
+        },
+        {
+          "step": 23000,
+          "val_loss_smoothed": 3.9775
+        },
+        {
+          "step": 23500,
+          "val_loss_smoothed": 3.9919
+        },
+        {
+          "step": 24000,
+          "val_loss_smoothed": 3.9735
+        },
+        {
+          "step": 24500,
+          "val_loss_smoothed": 3.9712
+        },
+        {
+          "step": 25000,
+          "val_loss_smoothed": 3.9401
+        },
+        {
+          "step": 25500,
+          "val_loss_smoothed": 3.9473
+        },
+        {
+          "step": 26000,
+          "val_loss_smoothed": 3.9235
+        },
+        {
+          "step": 26500,
+          "val_loss_smoothed": 3.9311
+        },
+        {
+          "step": 27000,
+          "val_loss_smoothed": 3.9419
+        },
+        {
+          "step": 27500,
+          "val_loss_smoothed": 3.9606
+        },
+        {
+          "step": 28000,
+          "val_loss_smoothed": 3.9764
+        },
+        {
+          "step": 28500,
+          "val_loss_smoothed": 3.9288
+        },
+        {
+          "step": 29000,
+          "val_loss_smoothed": 3.9448
+        },
+        {
+          "step": 29500,
+          "val_loss_smoothed": 3.9119
+        },
+        {
+          "step": 30000,
+          "val_loss_smoothed": 3.9457
+        }
+      ]
+    },
+    "gain": {
+      "run_id": "cllm-v1.5-026",
+      "label": "Gain (precision + layer)",
+      "color_hex": "#7c83ff",
+      "linestyle": "solid",
+      "trajectory": [
+        {
+          "step": 500,
+          "val_loss_smoothed": 8.918
+        },
+        {
+          "step": 1000,
+          "val_loss_smoothed": 8.2411
+        },
+        {
+          "step": 1500,
+          "val_loss_smoothed": 7.9032
+        },
+        {
+          "step": 2000,
+          "val_loss_smoothed": 7.6745
+        },
+        {
+          "step": 2500,
+          "val_loss_smoothed": 7.4263
+        },
+        {
+          "step": 3000,
+          "val_loss_smoothed": 7.2338
+        },
+        {
+          "step": 3500,
+          "val_loss_smoothed": 7.0397
+        },
+        {
+          "step": 4000,
+          "val_loss_smoothed": 6.8757
+        },
+        {
+          "step": 4500,
+          "val_loss_smoothed": 6.7377
+        },
+        {
+          "step": 5000,
+          "val_loss_smoothed": 6.5987
+        },
+        {
+          "step": 5500,
+          "val_loss_smoothed": 6.2499
+        },
+        {
+          "step": 6000,
+          "val_loss_smoothed": 6.0092
+        },
+        {
+          "step": 6500,
+          "val_loss_smoothed": 5.7827
+        },
+        {
+          "step": 7000,
+          "val_loss_smoothed": 5.5619
+        },
+        {
+          "step": 7500,
+          "val_loss_smoothed": 5.3953
+        },
+        {
+          "step": 8000,
+          "val_loss_smoothed": 5.2688
+        },
+        {
+          "step": 8500,
+          "val_loss_smoothed": 5.1335
+        },
+        {
+          "step": 9000,
+          "val_loss_smoothed": 5.0321
+        },
+        {
+          "step": 9500,
+          "val_loss_smoothed": 4.915
+        },
+        {
+          "step": 10000,
+          "val_loss_smoothed": 4.8479
+        },
+        {
+          "step": 10500,
+          "val_loss_smoothed": 4.7628
+        },
+        {
+          "step": 11000,
+          "val_loss_smoothed": 4.6784
+        },
+        {
+          "step": 11500,
+          "val_loss_smoothed": 4.6106
+        },
+        {
+          "step": 12000,
+          "val_loss_smoothed": 4.5679
+        },
+        {
+          "step": 12500,
+          "val_loss_smoothed": 4.5205
+        },
+        {
+          "step": 13000,
+          "val_loss_smoothed": 4.4383
+        },
+        {
+          "step": 13500,
+          "val_loss_smoothed": 4.4123
+        },
+        {
+          "step": 14000,
+          "val_loss_smoothed": 4.3527
+        },
+        {
+          "step": 14500,
+          "val_loss_smoothed": 4.3233
+        },
+        {
+          "step": 15000,
+          "val_loss_smoothed": 4.2781
+        },
+        {
+          "step": 15500,
+          "val_loss_smoothed": 4.2212
+        },
+        {
+          "step": 16000,
+          "val_loss_smoothed": 4.1917
+        },
+        {
+          "step": 16500,
+          "val_loss_smoothed": 4.1754
+        },
+        {
+          "step": 17000,
+          "val_loss_smoothed": 4.1472
+        },
+        {
+          "step": 17500,
+          "val_loss_smoothed": 4.1155
+        },
+        {
+          "step": 18000,
+          "val_loss_smoothed": 4.1042
+        },
+        {
+          "step": 18500,
+          "val_loss_smoothed": 4.0734
+        },
+        {
+          "step": 19000,
+          "val_loss_smoothed": 4.0629
+        },
+        {
+          "step": 19500,
+          "val_loss_smoothed": 4.053
+        },
+        {
+          "step": 20000,
+          "val_loss_smoothed": 4.0234
+        },
+        {
+          "step": 20500,
+          "val_loss_smoothed": 4.0445
+        },
+        {
+          "step": 21000,
+          "val_loss_smoothed": 4.0464
+        },
+        {
+          "step": 21500,
+          "val_loss_smoothed": 4.0266
+        },
+        {
+          "step": 22000,
+          "val_loss_smoothed": 4.0018
+        },
+        {
+          "step": 22500,
+          "val_loss_smoothed": 3.993
+        },
+        {
+          "step": 23000,
+          "val_loss_smoothed": 4.0075
+        },
+        {
+          "step": 23500,
+          "val_loss_smoothed": 3.9891
+        },
+        {
+          "step": 24000,
+          "val_loss_smoothed": 3.9863
+        },
+        {
+          "step": 24500,
+          "val_loss_smoothed": 3.9562
+        },
+        {
+          "step": 25000,
+          "val_loss_smoothed": 3.9624
+        },
+        {
+          "step": 25500,
+          "val_loss_smoothed": 3.9409
+        },
+        {
+          "step": 26000,
+          "val_loss_smoothed": 3.9491
+        },
+        {
+          "step": 26500,
+          "val_loss_smoothed": 3.9597
+        },
+        {
+          "step": 27000,
+          "val_loss_smoothed": 3.9779
+        },
+        {
+          "step": 27500,
+          "val_loss_smoothed": 3.9938
+        },
+        {
+          "step": 28000,
+          "val_loss_smoothed": 3.9474
+        },
+        {
+          "step": 28500,
+          "val_loss_smoothed": 3.9636
+        },
+        {
+          "step": 29000,
+          "val_loss_smoothed": 3.9326
+        },
+        {
+          "step": 29500,
+          "val_loss_smoothed": 3.9666
+        },
+        {
+          "step": 30000,
+          "val_loss_smoothed": 3.9498
+        }
+      ]
+    },
+    "callouts": {
+      "final_smoothed_baseline": 3.946,
+      "final_smoothed_gain": 3.95,
+      "final_difference": 0.004,
+      "note": "Final smoothed difference: 0.004 nats. The two curves are visually indistinguishable from ~step 5,000 onward."
+    }
+  },
+  "panel_b_preference": {
+    "title": "Blind A/B preference is decisively for gain",
+    "subtitle": "1,181 judgments by a 42-judge blind panel (29 humans + 13 foundation models, eleven vendors); p = 2.80 x 10^-8",
+    "breakdown_of_decisive": {
+      "baseline_pct": 40.1,
+      "gain_pct": 59.9,
+      "baseline_color_hex": "#bbbbbb",
+      "gain_color_hex": "#7c83ff",
+      "note": "784 decisive judgments (ties excluded); 397 ties total in 1,181."
+    },
+    "sensitivity_band": {
+      "description": "Six sensitivity-filter rows in addition to the headline. Every filter preserves the direction; the strictest filter (exclude speed-clickers + tie-biased + partials) gives 63.1%.",
+      "min_pct": 59.0,
+      "max_pct": 63.1,
+      "headline_pct": 59.9,
+      "rows": [
+        {
+          "label": "All judges (headline)",
+          "n_judges": 42,
+          "n_judgments": 1181,
+          "a": 314,
+          "b": 470,
+          "t": 397,
+          "b_pct_decisive": 59.95,
+          "p_value": 2.8015280464846255e-08
+        },
+        {
+          "label": "Foundation models only",
+          "n_judges": 13,
+          "n_judgments": 416,
+          "a": 118,
+          "b": 170,
+          "t": 128,
+          "b_pct_decisive": 59.03,
+          "p_value": 0.0025930503531481526
+        },
+        {
+          "label": "Humans only",
+          "n_judges": 29,
+          "n_judgments": 765,
+          "a": 196,
+          "b": 300,
+          "t": 269,
+          "b_pct_decisive": 60.48,
+          "p_value": 3.4684180932874554e-06
+        },
+        {
+          "label": "Exclude human speed-clickers (median <15s; FMs exempt)",
+          "n_judges": 34,
+          "n_judgments": 982,
+          "a": 238,
+          "b": 401,
+          "t": 343,
+          "b_pct_decisive": 62.75,
+          "p_value": 1.1720179198123416e-10
+        },
+        {
+          "label": "Exclude tie-biased judges (>80% ties)",
+          "n_judges": 37,
+          "n_judgments": 1051,
+          "a": 308,
+          "b": 464,
+          "t": 279,
+          "b_pct_decisive": 60.1,
+          "p_value": 2.181185423335721e-08
+        },
+        {
+          "label": "Exclude partial completions (n<32)",
+          "n_judges": 35,
+          "n_judgments": 1120,
+          "a": 297,
+          "b": 451,
+          "t": 372,
+          "b_pct_decisive": 60.29,
+          "p_value": 1.9838133266966572e-08
+        },
+        {
+          "label": "Exclude all of the above (strictest)",
+          "n_judges": 27,
+          "n_judgments": 864,
+          "a": 230,
+          "b": 394,
+          "t": 240,
+          "b_pct_decisive": 63.14,
+          "p_value": 5.2956086984319525e-11
+        }
+      ],
+      "reference_line_at_pct": 50.0,
+      "reference_line_label": "Chance (no preference)"
+    }
+  },
+  "overall_message": "The two panels are the paper's central claim in one image: aggregate validation loss says the baseline and gain models are essentially the same; 42 blind judges say the gain model is preferred at p = 2.80e-8 across 1,181 comparisons, and the direction survives every sensitivity filter (range 59.0% to 63.1% across filters)."
+}
