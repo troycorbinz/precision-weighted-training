@@ -1,0 +1,123 @@
+{
+  "figure": "fig3_per_category_preference",
+  "description": "Horizontal bar chart of decisive A/B preference rate by prompt category. Sorted descending by gain%-decisive. Visual story: gain wins decisively in four of seven categories, leans gain in two more, and only loses (narrowly) on factual recall \u2014 exactly what the precision-weighting mechanism predicts.",
+  "panel": {
+    "title": "Where the preference comes from",
+    "subtitle": "Decisive blind A/B preference rate by prompt category (1,181 judgments across 32 prompts in 7 categories)",
+    "x_label": "Gain % of decisive judgments",
+    "y_label": "",
+    "x_range": [
+      0,
+      100
+    ],
+    "reference_line_at_pct": 50.0,
+    "reference_line_label": "Chance (50%)",
+    "bars": [
+      {
+        "category": "world_knowledge",
+        "display_label": "world knowledge",
+        "n_judgments": 70,
+        "a": 12,
+        "b": 35,
+        "t": 23,
+        "decisive": 47,
+        "gain_pct_decisive": 74.5,
+        "baseline_pct_decisive": 25.5,
+        "tie_pct_total": 32.9,
+        "p_value": 0.0010885382064742544,
+        "band": "gain_strong"
+      },
+      {
+        "category": "creative",
+        "display_label": "creative",
+        "n_judgments": 181,
+        "a": 33,
+        "b": 82,
+        "t": 66,
+        "decisive": 115,
+        "gain_pct_decisive": 71.3,
+        "baseline_pct_decisive": 28.7,
+        "tie_pct_total": 36.5,
+        "p_value": 5.57142320848034e-06,
+        "band": "gain_strong"
+      },
+      {
+        "category": "instruction_following",
+        "display_label": "instruction following",
+        "n_judgments": 105,
+        "a": 19,
+        "b": 41,
+        "t": 45,
+        "decisive": 60,
+        "gain_pct_decisive": 68.3,
+        "baseline_pct_decisive": 31.7,
+        "tie_pct_total": 42.9,
+        "p_value": 0.0062176026593266705,
+        "band": "gain_strong"
+      },
+      {
+        "category": "conversational",
+        "display_label": "conversational",
+        "n_judgments": 177,
+        "a": 46,
+        "b": 82,
+        "t": 49,
+        "decisive": 128,
+        "gain_pct_decisive": 64.1,
+        "baseline_pct_decisive": 35.9,
+        "tie_pct_total": 27.7,
+        "p_value": 0.001862468524299045,
+        "band": "gain_strong"
+      },
+      {
+        "category": "reasoning",
+        "display_label": "reasoning",
+        "n_judgments": 228,
+        "a": 67,
+        "b": 91,
+        "t": 70,
+        "decisive": 158,
+        "gain_pct_decisive": 57.6,
+        "baseline_pct_decisive": 42.4,
+        "tie_pct_total": 30.7,
+        "p_value": 0.06694263927535096,
+        "band": "gain_lean"
+      },
+      {
+        "category": "structured_output",
+        "display_label": "structured output",
+        "n_judgments": 175,
+        "a": 51,
+        "b": 65,
+        "t": 59,
+        "decisive": 116,
+        "gain_pct_decisive": 56.0,
+        "baseline_pct_decisive": 44.0,
+        "tie_pct_total": 33.7,
+        "p_value": 0.2272749463316086,
+        "band": "gain_lean"
+      },
+      {
+        "category": "factual",
+        "display_label": "factual",
+        "n_judgments": 245,
+        "a": 86,
+        "b": 74,
+        "t": 85,
+        "decisive": 160,
+        "gain_pct_decisive": 46.2,
+        "baseline_pct_decisive": 53.8,
+        "tie_pct_total": 34.7,
+        "p_value": 0.3845671514777665,
+        "band": "baseline_lean"
+      }
+    ],
+    "color_scheme": {
+      "gain_strong_hex": "#7c83ff",
+      "gain_lean_hex": "#b0b6ff",
+      "baseline_lean_hex": "#bbbbbb",
+      "rule": "gain_strong = >=60% decisive (strong gain); gain_lean = 50-60% (gain leans); baseline_lean = <50% (baseline leans)."
+    }
+  },
+  "overall_message": "The preference effect is broad, not concentrated in one prompt type. Gain wins or leans on six of seven categories; the only baseline-lean category (factual recall, 46.2% decisive) is the one task where rote retrieval of specific bindings dominates \u2014 exactly the regime where precision weighting de-emphasizes confidently predicted tokens."
+}
