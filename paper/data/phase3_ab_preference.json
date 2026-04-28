@@ -748,8 +748,24 @@
       "p_value": 1.9838133266966572e-08
     },
     {
+      "label": "Exclude Author (independent panel only)",
+      "excluded": [
+        "Author"
+      ],
+      "n_judges": 41,
+      "n": 1149,
+      "a": 306,
+      "b": 453,
+      "t": 390,
+      "decisive": 759,
+      "b_pct_decisive": 59.68,
+      "tie_pct": 33.94,
+      "p_value": 1.0640117263693199e-07
+    },
+    {
       "label": "Exclude all of the above (strictest)",
       "excluded": [
+        "Author",
         "DeepSeek v3",
         "H10",
         "H11",
@@ -766,15 +782,15 @@
         "H7",
         "H9"
       ],
-      "n_judges": 27,
-      "n": 864,
-      "a": 230,
-      "b": 394,
-      "t": 240,
-      "decisive": 624,
-      "b_pct_decisive": 63.14,
-      "tie_pct": 27.78,
-      "p_value": 5.2956086984319525e-11
+      "n_judges": 26,
+      "n": 832,
+      "a": 222,
+      "b": 377,
+      "t": 233,
+      "decisive": 599,
+      "b_pct_decisive": 62.94,
+      "tie_pct": 28.0,
+      "p_value": 2.5015691466951064e-10
     }
   ],
   "category_breakdown": {
@@ -1146,5 +1162,210 @@
       "tie_pct": 35.4,
       "p_value": 0.00012566816637842883
     }
+  },
+  "inter_annotator_agreement": {
+    "method": "Per-question majority direction (Human aggregate vs FM aggregate) and Pearson r of per-question B%-decisive between the two types.",
+    "n_questions": 32,
+    "questions_with_same_majority": 26,
+    "questions_with_same_decisive_direction": 26,
+    "questions_both_types_decisive": 30,
+    "pct_same_majority": 81.2,
+    "pct_same_decisive_direction_of_decisive_pairs": 86.7,
+    "pearson_r_per_question_b_pct_decisive": 0.782,
+    "n_pairs_for_pearson": 32,
+    "details": [
+      {
+        "question_id": 1,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 2,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 3,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 4,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 5,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 6,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 7,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 8,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 9,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 10,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 11,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 12,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 13,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 14,
+        "human_majority": "gain",
+        "fm_majority": "tied",
+        "agree": false
+      },
+      {
+        "question_id": 15,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 16,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 17,
+        "human_majority": "tied",
+        "fm_majority": "gain",
+        "agree": false
+      },
+      {
+        "question_id": 18,
+        "human_majority": "baseline",
+        "fm_majority": "baseline",
+        "agree": true
+      },
+      {
+        "question_id": 19,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 20,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 21,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 22,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 23,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 24,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 25,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 26,
+        "human_majority": "gain",
+        "fm_majority": "baseline",
+        "agree": false
+      },
+      {
+        "question_id": 27,
+        "human_majority": "gain",
+        "fm_majority": "baseline",
+        "agree": false
+      },
+      {
+        "question_id": 28,
+        "human_majority": "baseline",
+        "fm_majority": "gain",
+        "agree": false
+      },
+      {
+        "question_id": 29,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 30,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      },
+      {
+        "question_id": 31,
+        "human_majority": "gain",
+        "fm_majority": "baseline",
+        "agree": false
+      },
+      {
+        "question_id": 32,
+        "human_majority": "gain",
+        "fm_majority": "gain",
+        "agree": true
+      }
+    ]
   }
 }
