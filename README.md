@@ -49,14 +49,25 @@ Across 1,181 judgments from a 42-judge blind panel (29 humans, including the aut
 
 ```
 src/
-  gain_functions.py         # Per-token gain functions (precision, linear, focal, sigmoid, uniform)
-  layer_gain.py             # Per-layer divergence gradient scaler
+  gain_functions.py             # Per-token gain functions (precision, linear, focal, sigmoid, uniform)
+  layer_gain.py                 # Per-layer divergence gradient scaler
 eval/
-  ab_compare.py             # Blind A/B comparison Flask webapp (see note below)
+  ab_compare.py                 # Blind A/B comparison Flask webapp (see note below)
 configs/
-  eval_questions_1.2B.json  # 32 evaluation prompts across 7 categories
+  eval_questions_1.2B.json      # 32 evaluation prompts across 7 categories
 paper/
-  precision-weighted-training.md  # Full paper with all experimental results
+  precision-weighted-training.md   # Full paper source (markdown)
+  precision-weighted-training.pdf  # Rendered PDF
+  build_pdf.py                     # Pandoc-based renderer used to build the PDF
+  data/                            # JSON metrics extracted from W&B (per-judge, per-step, per-layer)
+    phase1_final_metrics.json      # Phase 1: 50M / 5K-step gain-function variant comparison
+    phase2_final_metrics.json      # Phase 2: ablation study metrics
+    phase3_run_summary.json        # Phase 3: 1.2B baseline vs gain-trained run summary
+    phase3_loss_trajectories.json  # Step-by-step train/val loss for both 1.2B runs
+    phase3_layer_divergence.json   # Per-layer divergence over training (used in Fig. 1)
+    phase3_ab_preference.json      # Full per-judge A/B preference dataset (1,181 judgments)
+  figures/                         # Paper figures + the scripts that generate them from data/
+LICENSE                            # MIT
 ```
 
 ## Quick Start
