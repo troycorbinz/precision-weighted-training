@@ -156,9 +156,9 @@ def render_fig2():
     bl_color = '#777777'
     gn_color = '#7c83ff'
 
-    fig = plt.figure(figsize=(11.5, 5.4))
+    fig = plt.figure(figsize=(11.5, 5.0))
     gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.22,
-                          left=0.07, right=0.97, top=0.78, bottom=0.12)
+                          left=0.07, right=0.97, top=0.86, bottom=0.13)
     ax_l = fig.add_subplot(gs[0, 0])
     ax_r = fig.add_subplot(gs[0, 1])
 
@@ -279,10 +279,6 @@ def render_fig2():
                    r'p = 2.80 × 10$^{-8}$',
                    loc='left', pad=10)
     ax_r.xaxis.set_major_locator(MultipleLocator(20))
-
-    # Suptitle banner across both panels (positioned via subplots_adjust above)
-    fig.suptitle('Aggregate val loss says nothing changed; 42 blind judges said something changed.',
-                 fontsize=13, fontweight='bold', y=0.96, x=0.5)
 
     out = HERE / 'fig2_loss_vs_preference.png'
     fig.savefig(out)
