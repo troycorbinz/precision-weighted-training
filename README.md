@@ -2,7 +2,7 @@
 
 **When Loss and Quality Diverge**
 
-Standard language model training treats every token and every layer equally. This repository provides two composable training-time interventions, inspired by [Predictive Coding](https://en.wikipedia.org/wiki/Predictive_coding) theory from neuroscience, that reshape the learning signal to produce qualitatively better output — even when aggregate loss metrics show no difference.
+Standard language model training treats every token and every layer equally. This repository provides two composable training-time interventions, inspired by [Predictive Coding](https://en.wikipedia.org/wiki/Predictive_coding) theory from neuroscience, that reshape the learning signal to produce qualitatively better output, even when aggregate loss metrics show no difference.
 
 **Read the full paper: [paper/precision-weighted-training.md](paper/precision-weighted-training.md)**
 
@@ -18,12 +18,12 @@ gain_i = clamp(1 + scale * (loss_i - mean_loss) / variance, min, max)
 
 - Tokens the model is uncertain about (high loss relative to batch mean) get **amplified** gradient
 - Tokens it already predicts well get **attenuated** gradient
-- The `1/variance` term is the **precision** — it self-regulates: noisy batches (high variance) get conservative, near-uniform gain; consistent batches (low variance) get stronger redistribution
-- **Mean-normalized by construction**: since `mean(loss_i - mean_loss) = 0`, the average gain is exactly 1.0. Total gradient magnitude is preserved — gain redistributes the learning signal, it does not amplify or suppress it. This property is critical; our experiments showed that gain functions where the mean drifts away from 1.0 cause training degeneration
+- The `1/variance` term is the **precision**: it self-regulates. Noisy batches (high variance) get conservative, near-uniform gain; consistent batches (low variance) get stronger redistribution
+- **Mean-normalized by construction**: since `mean(loss_i - mean_loss) = 0`, the average gain is exactly 1.0. Total gradient magnitude is preserved; gain redistributes the learning signal, it does not amplify or suppress it. This property is critical; our experiments showed that gain functions where the mean drifts away from 1.0 cause training degeneration
 
 ### 2. Per-layer divergence gradient scaling (`src/layer_gain.py`)
 
-After each forward pass, each transformer block's "divergence" is measured — how much it changed the representation: `||output - input|| / ||input||`. After backward, gradients are scaled by this divergence:
+After each forward pass, each transformer block's "divergence" is measured (how much it changed the representation: `||output - input|| / ||input||`). After backward, gradients are scaled by this divergence:
 
 - **High-divergence layers** (actively revising representations) get amplified gradients
 - **Low-divergence layers** (stable, not changing much) get attenuated gradients
@@ -41,7 +41,7 @@ In a controlled 1.2B-parameter comparison (3.9B tokens, both models trained on i
 | Blind A/B preference | 40.1% of decisive | **59.9% of decisive** (p = 2.80 × 10⁻⁸) |
 | Compute overhead | — | **none** (identical wall-clock throughput) |
 
-Across 1,181 judgments from a 42-judge blind panel (29 humans — the author plus 28 volunteers — and 13 foundation-model judges spanning eleven vendors), the gain-trained model is preferred by humans (60.5% decisive) and foundation models (59.0% decisive) within 1.5 points of each other. The direction survives every sensitivity filter we apply (FMs only, humans only, exclude human speed-clickers, exclude tie-biased judges, exclude partial completions, exclude all of the above simultaneously); the strictest filter leaves 27 engaged judges and 864 judgments with **63.1% decisive gain preference at p = 5.3 × 10⁻¹¹**. The preference is strongest on open-ended tasks (creative 71.3%, world knowledge 74.5%, instruction following 68.3%, conversational 64.1%) and narrowest on factual recall, the one category with a small baseline lean (46.2% decisive) — consistent with the mechanism's theoretical prediction that precision weighting favors generalization over rote memorization.
+Across 1,181 judgments from a 42-judge blind panel (29 humans, including the author, plus 13 foundation-model judges spanning eleven vendors), the gain-trained model is preferred by humans (60.5% decisive) and foundation models (59.0% decisive) within 1.5 points of each other. Humans and foundation-model judges also agree on which prompts favor gain: 26 of 32 questions show the same human-majority and FM-majority direction (81.2%), and per-question gain rates correlate at Pearson r = 0.78 between the two judge types. The direction survives every sensitivity filter we apply (FMs only, humans only, exclude human speed-clickers, exclude tie-biased judges, exclude partial completions, exclude the author, exclude all of the above simultaneously); the strictest filter leaves 26 engaged judges and 832 judgments with **62.9% decisive gain preference at p = 2.5 × 10⁻¹⁰**. The preference is strongest on open-ended tasks (creative 71.3%, world knowledge 74.5%, instruction following 68.3%, conversational 64.1%) and narrowest on factual recall, the one category with a small baseline lean (46.2% decisive), consistent with the mechanism's theoretical prediction that precision weighting favors generalization over rote memorization.
 
 **Full methodology, per-category breakdowns, and discussion in the [paper](paper/precision-weighted-training.md).**
 
@@ -73,13 +73,13 @@ pip install torch  # PyTorch 2.0+ required
 
 Portable to most PyTorch transformer training loops with minimal changes. The per-token gain function requires only switching to `reduction='none'` and one multiply; the layer-gain scaler requires small architecture-specific edits (see porting checklist below).
 
-**Per-token gain** — the only change is using `reduction='none'` to get per-token losses, then multiplying by the gain before taking the mean:
+**Per-token gain.** The only change is using `reduction='none'` to get per-token losses, then multiplying by the gain before taking the mean:
 
 ```python
 import torch.nn.functional as F
 from src.gain_functions import create_gain_function
 
-# Configure — "precision" is the recommended variant (see paper Section 3.1)
+# Configure: "precision" is the recommended variant (see paper Section 4.1)
 config = {
     "training": {
         "gain_function": "precision",
@@ -88,7 +88,7 @@ config = {
 }
 gain_fn = create_gain_function(config)
 
-# In your training step — replace:
+# In your training step, replace:
 #   loss = F.cross_entropy(logits, targets)
 # with:
 per_token_loss = F.cross_entropy(
@@ -151,7 +151,7 @@ config = {
             "strength": 0.5,       # 0 = no effect, 1.0 = full scaling
             "min_scale": 0.1,      # safety floor (no layer gets <10% gradient)
             "max_scale": 3.0,      # safety ceiling
-            "exclude_layers": [0]  # layer 0 is always a structural outlier (see paper Section 3.2)
+            "exclude_layers": []  # all layers participate in the mean; see paper Section 6.4
         }
     }
 }
@@ -185,7 +185,7 @@ config = {
             "strength": 0.5,
             "min_scale": 0.1,
             "max_scale": 3.0,
-            "exclude_layers": [0]
+            "exclude_layers": []
         }
     }
 }
@@ -195,7 +195,7 @@ layer_scaler = LayerGainScaler(config)
 # --- Training step ---
 optimizer.zero_grad()
 
-# Forward pass (model records _layer_divergences internally — see Step 1 above)
+# Forward pass (model records _layer_divergences internally, see Step 1 above)
 logits = model(input_ids)
 
 # Per-token gain-weighted loss
@@ -236,7 +236,7 @@ optimizer.step()
       "strength": 0.5,
       "min_scale": 0.1,
       "max_scale": 3.0,
-      "exclude_layers": [0]
+      "exclude_layers": []
     }
   }
 }
@@ -259,7 +259,7 @@ If you're integrating into an existing codebase, here is the complete list of ch
 1. Switch your CE loss to `reduction='none'` to get per-token losses
 2. Mask out padding / ignored tokens (the gain function handles this via `loss > 0`)
 3. Multiply per-token loss by the detached gain weights before reducing to a scalar
-4. Call `.mean()` on the result — gain is mean-normalized, so total gradient magnitude is preserved
+4. Call `.mean()` on the result. Gain is mean-normalized, so total gradient magnitude is preserved
 
 **Per-layer divergence scaling (requires architecture-specific edits):**
 
@@ -284,7 +284,7 @@ The interactive and batch-generation modes have model-loading imports specific t
 
 ### Judge flow
 
-1. `/` — judge enters a display name (or pseudonym), then completes an optional 5-question demographic survey (LLM usage frequency, background, primary language, age band, prior participation in language-model studies). All questions are optional; each can be left blank.
+1. `/`: judge enters a display name (or pseudonym), then completes an optional 5-question demographic survey (LLM usage frequency, background, primary language, age band, prior participation in language-model studies). All questions are optional; each can be left blank. The judging rubric they see asks them to score four axes appropriate to early-training output: relevance, coherence, diversity, and human-likeness. Verbatim text is in the paper's Appendix B.1.
 2. The webapp assigns a deterministic per-judge RNG (seeded from `judge_id`) that draws the `(a_gen_idx, b_gen_idx, left_is_a)` pairing for each question. This avoids the modular-collision failure where linear `(q*k + jid) % n_gens` schemes produce identical responses for judges whose IDs differ by a multiple of `n_gens`.
 3. The judge is shown 32 blind pairs side-by-side and picks Left / Right / Tie.
 4. Results are stored in `ab_results.json` and demographics in `ab_demographics.json` (local JSON files, not a database).
@@ -293,18 +293,19 @@ The interactive and batch-generation modes have model-loading imports specific t
 
 A dashboard auto-refreshing every 30 seconds, covering:
 
-- **Aggregate** — total judgments, total judges, decisive (A+B) count, A/B/tie counts, B% of decisive, two-sided binomial p-value.
-- **Sensitivity** — the headline B% re-computed under multiple filters:
-  - **FMs only** and **Humans only** — splits the panel to check whether the signal lives in both populations or is carried by one. Directly addresses the "foundation-model judges share training priors" critique.
-  - **Exclude human speed-clickers** (median vote interval <15s; FMs exempt as fast-by-nature) — removes inattentive humans.
-  - **Exclude tie-biased judges** (>80% ties) — removes judges who couldn't or wouldn't discriminate.
-  - **Exclude partial completions** (n<32) — removes judges who didn't complete, whose prompt coverage is skewed toward early questions.
-  - **Exclude all of the above** — the strictest filter.
-- **Per-judge** — one row per judge: type classification (FM/Human based on a name-marker tuple), vote counts, tie rate, B% of decisive, median seconds between votes, first/last vote timestamps. Orange highlights flag tie rate >80% or median speed <15s.
-- **Demographics** — counts for each of the 5 survey fields.
-- **Per-question coverage** — 32 rows (one per prompt) showing total votes, A/B/tie breakdown, B% of decisive, and a prompt snippet. Any question below the max vote count is highlighted to surface coverage gaps.
-- **Per-answer coverage** — `n_questions × n_models × n_generations` rows showing how often each specific generation was drawn into a pairing and how often it won or tied. Lets you verify that the per-judge RNG is producing adequate spread across generations and surface any generation that was never shown.
-- **Recent activity** — last 15 votes with judge, question #, and result.
+- **Aggregate.** Total judgments, total judges, decisive (A+B) count, A/B/tie counts, B% of decisive, two-sided binomial p-value.
+- **Sensitivity.** The headline B% re-computed under multiple filters:
+  - **FMs only** and **Humans only**: splits the panel to check whether the signal lives in both populations or is carried by one. Directly addresses the "foundation-model judges share training priors" critique.
+  - **Exclude human speed-clickers** (median vote interval <15s; FMs exempt as fast-by-nature): removes inattentive humans.
+  - **Exclude tie-biased judges** (>80% ties): removes judges who couldn't or wouldn't discriminate.
+  - **Exclude partial completions** (n<32): removes judges who didn't complete, whose prompt coverage is skewed toward early questions.
+  - **Exclude Author**: removes the author's own judgments to confirm the headline holds on a fully external panel.
+  - **Exclude all of the above**: the strictest filter.
+- **Per-judge.** One row per judge: type classification (FM/Human based on a name-marker tuple), vote counts, tie rate, B% of decisive, median seconds between votes, first/last vote timestamps. Orange highlights flag tie rate >80% or median speed <15s.
+- **Demographics.** Counts for each of the 5 survey fields.
+- **Per-question coverage.** 32 rows (one per prompt) showing total votes, A/B/tie breakdown, B% of decisive, and a prompt snippet. Any question below the max vote count is highlighted to surface coverage gaps.
+- **Per-answer coverage.** `n_questions × n_models × n_generations` rows showing how often each specific generation was drawn into a pairing and how often it won or tied. Lets you verify that the per-judge RNG is producing adequate spread across generations and surface any generation that was never shown.
+- **Recent activity.** Last 15 votes with judge, question #, and result.
 
 ### Interpreting the sensitivity rows
 

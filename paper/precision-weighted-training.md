@@ -520,7 +520,7 @@ All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs a
 
 ### B.1 Instructions shown to judges
 
-A first-time judge saw the following modal before any pairing was presented. The text is reproduced verbatim from the webapp template at [scripts/ab_compare.py](https://github.com/troycorbinz/cllm-v1.5-public/blob/main/scripts/ab_compare.py) (the public repo's mirror of the eval app):
+A first-time judge saw the following modal before any pairing was presented. The text is reproduced verbatim from the webapp template at [eval/ab_compare.py](../eval/ab_compare.py):
 
 > **How to Judge These Responses**
 >
