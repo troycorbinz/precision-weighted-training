@@ -275,8 +275,7 @@ def render_fig2():
     ax_r.set_yticks([])
     ax_r.spines['left'].set_visible(False)
     ax_r.set_title('Blind A/B preference is decisively for gain\n'
-                   '1,181 judgments · 42 judges (29 humans + 13 FMs, 11 vendors) · '
-                   r'p = 2.80 × 10$^{-8}$',
+                   r'1,181 judgments · 42 judges · p = 2.80 × 10$^{-8}$',
                    loc='left', pad=10)
     ax_r.xaxis.set_major_locator(MultipleLocator(20))
 
