@@ -312,6 +312,8 @@ A single-scalar loss metric cannot distinguish between qualitatively different g
 - **29 human judges** (the author plus 28 volunteers). Self-reported background per the optional demographic survey, which all 29 humans completed: 15 non-technical, 12 technical without ML background, 2 ML-or-CS-research (the author and one self-reported).
 - **13 foundation-model judges spanning eleven vendors** (Anthropic, OpenAI, Google, DeepSeek, Meta, xAI, Alibaba (Qwen), Moonshot (Kimi), MiniMax, Mistral, Zhipu), with two judges each from DeepSeek (v3 and v4 Flash) and Meta (Llama 4 Maverick and Muse Spark). Each received the same pairwise comparison interface as humans via a standardized copy-to-clipboard prompt; foundation-model judges did not fill out the demographic survey and appear as "—" in the background column of Appendix C.
 
+**Rubric.** Each first-time judge saw an instruction modal asking them to score on four axes appropriate to early-training output: relevance, coherence, diversity, and human-likeness. The full verbatim instruction text and the demographic survey are reproduced in Appendix B.1 and B.2; the rubric is what the paper means *operationally* by quality.
+
 Judges were asked to evaluate all 32 pairings; 35 of 42 completed all 32, the remaining 7 partially. Judges could choose "left", "right", or "tie". Model identities were revealed only after submission. The total yielded **1,181 judgments**. Headline numbers below use all judgments; Section 7.2 verifies that the direction is preserved when we exclude partial completions, tie-biased judges, and human speed-clickers.
 
 **Interface.** A local Flask webapp ([eval/ab_compare.py](../eval/ab_compare.py)) presented pairings and recorded judgments as JSON. The webapp tracked `left_is_a` per pairing; the post-hoc `winner` field was computed from `choice` and `left_is_a` so that "a" always refers to model A (baseline) and "b" to model B (gain), independent of display position.
@@ -479,7 +481,7 @@ Research assistance was provided by Claude (Anthropic), specifically in connecti
 
 ---
 
-## Appendix A, W&B Run IDs
+## Appendix A: W&B Run IDs
 
 All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs are listed below for reference and in case the project is made public in the future; they cannot currently be accessed externally. The numerical data extracted from these runs is available as JSON in [paper/data/](./data/), see [paper/data/README.md](./data/README.md) for a map from files to paper sections.
 
@@ -507,14 +509,51 @@ All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs a
 | Baseline (uniform) | cllm-v1.5-025 | cllm-v1.5-025 Baseline: 20L/1024E ~1.2B |
 | Gain (precision + layer) | cllm-v1.5-026 | cllm-v1.5-026 Gain: 20L/1024E ~1.2B |
 
-### Phase 3 scale-up (1.5B params, in progress), Section 6.4 ablation
+### Phase 3 scale-up (1.5B params, in progress): Section 6.4 ablation
 
 | Variant | W&B Run ID | Display Name |
 |---|---|---|
 | L0 excluded (discontinued) | cllm-v1.5-028 | cllm-v1.5-028 prod: 24L x 1280E ~1.48B |
 | L0 included (ongoing) | cllm-v1.5-029 | cllm-v1.5-029 |
 
-## Appendix B, Preference Evaluation Question Set (32 prompts, 7 categories)
+## Appendix B: Preference Evaluation Protocol (rubric, demographics, and 32 prompts)
+
+### B.1 Instructions shown to judges
+
+A first-time judge saw the following modal before any pairing was presented. The text is reproduced verbatim from the webapp template at [scripts/ab_compare.py](https://github.com/troycorbinz/cllm-v1.5-public/blob/main/scripts/ab_compare.py) (the public repo's mirror of the eval app):
+
+> **How to Judge These Responses**
+>
+> You'll be comparing responses from two AI models that are still early in training. They will **NOT** produce correct or complete answers, that's expected and normal.
+>
+> **Judge based on:**
+>
+> - **Relevance.** Did the response attempt to address the question? Even partially? Mentioning a key word or concept from the prompt counts.
+> - **Coherence.** Does the text flow naturally? Are sentences grammatically structured, even if the content is wrong?
+> - **Diversity.** Does the response show varied vocabulary and structure, or does it repeat the same phrase over and over?
+> - **Human-likeness.** Does it read like something a person might write (even if confused)? Or does it look like a database dump or raw code?
+>
+> When in doubt, go with your gut. If both responses seem equally bad or equally good, pick "Both are equal / Can't decide." There are 32 questions and it takes about 10–15 minutes.
+
+The four-criterion rubric is what the paper means operationally by *quality*: a judge's preference is the joint outcome of these four axes weighted however that judge weights them, integrated across 32 prompts. The rubric was designed for early-training models (which produce noisy, partially incorrect output) and was deliberately permissive on factual correctness so that judges would not default to "tie" on every prompt where neither model produced the right answer.
+
+For each pairing, the judge saw the question text, two unlabelled response panels (Response Left / Response Right with model identity hidden until after submission), and three buttons: "This one is better" under each panel and "Both are equal / Can't decide" between them. Left/right placement of model A and model B was randomised independently per pairing per judge to remove position bias; the post-hoc `winner` field in the published JSON normalises this so that "a" always refers to model A (baseline) and "b" to model B (gain), independent of display position.
+
+### B.2 Demographic survey
+
+After completing all 32 pairings, judges were optionally invited to answer five demographic questions. Individual answers are not published; only aggregate summaries appear in §7.3 (`human_by_background`) and the published JSON. The exact survey copy was:
+
+> **A few quick questions about you.** This is for demographic context in the paper. Your individual answers aren't published, only aggregate summaries (e.g., "3 of N judges were daily LLM users"). Takes under a minute. Leave any question blank if you prefer.
+>
+> 1. How often do you use LLM chatbots (ChatGPT, Claude, Gemini, etc.)? *(Never or almost never / Occasionally / Weekly / Daily or near-daily)*
+> 2. Technical background? *(Non-technical / Technical but not ML-focused / ML or CS research)*
+> 3. Primary language you read/write in? *(free text)*
+> 4. Age range? *(Under 25 / 25–40 / 40–60 / Over 60)*
+> 5. Have you participated in model evaluation or A/B preference studies before? *(Yes / No)*
+
+Demographics were optional and not gating: a judge could skip the survey entirely and their judgments still counted. All 29 human judges completed the survey; foundation-model judges did not receive a demographic survey (a `—` appears in their background column in Appendix C).
+
+### B.3 The 32 prompts
 
 **Factual (6):** What is the capital of Japan? / How many legs does a spider have? / What planet is closest to the Sun? / What language is most widely spoken in Brazil? / Who wrote the play Romeo and Juliet? / What is the chemical symbol for water?
 
@@ -530,7 +569,7 @@ All runs are in a private W&B project (`troy-corbin-none/Corbin-LLM`). Run IDs a
 
 **World Knowledge (2):** Why do we have different time zones around the world? / What happens to water when it freezes?
 
-## Appendix C, Per-Judge Result Table (42 judges, 1,181 judgments)
+## Appendix C: Per-Judge Result Table (42 judges, 1,181 judgments)
 
 Rows are sorted by the timestamp of each judge's first vote. `n` = total judgments by that judge; `A` = votes for baseline (model 025); `B` = votes for gain (model 026); `T` = ties; `B%-decisive` = B / (A + B). `Median sec` = median seconds between consecutive votes by that judge, flagged below 15 s for human raters as a possible "speed-clicker" pattern (foundation models are excluded from that filter, they are fast by nature). `Background` is self-reported by the judge in the demographic survey, completed by all 29 humans; `—` indicates a foundation-model judge, which did not fill out the survey. Foundation-model judge labels are recorded as the product/version names available to the author at evaluation time and are intended for methodological reproducibility, not as durable model identifiers.
 
@@ -582,7 +621,7 @@ Rows are sorted by the timestamp of each judge's first vote. `n` = total judgmen
 
 Per-judge per-category counts (42 × 7 = 294 cells) are too many to embed in the manuscript; the full per-judge per-category breakdown is published as JSON at [paper/data/phase3_ab_preference.json](../data/phase3_ab_preference.json) along with the sensitivity-filter inputs and demographic counts.
 
-## Appendix D, Selected Layer Divergence Trajectory (Gain run)
+## Appendix D: Selected Layer Divergence Trajectory (Gain run)
 
 Reported values are `||x_out - x_in|| / ||x_in||` at block boundaries, logged once per step in `forward_blocks()` (outside checkpoint scope). The full JSON trajectory contains dense samples across training; the abridged print table below shows seven representative checkpoints and six selected layer columns.
 
